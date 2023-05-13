@@ -1,0 +1,11 @@
+# fly.toml file generated for ancient-wildflower-9311 on 2023-01-27T17:09:45+01:00
+
+app = "ancient-wildflower-9311"
+kill_signal = "SIGINT"
+kill_timeout = 5
+processes = []
+
+[env]
+
+[experimental]
+  auto_rollback = true
