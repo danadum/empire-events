@@ -17,4 +17,3 @@ if __name__ == "__main__":
     Thread(target=socket.run_forever, kwargs={'reconnect': 600}).start()
 
     Bot("%", base).run(os.getenv("TOKEN"))
-
