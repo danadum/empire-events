@@ -33,6 +33,7 @@ class MainSocket(websocket.WebSocketApp):
         while self.sock is not None:
             self.send("""%xt%EmpireEx_3%pin%1%<RoundHouseKick>%""")
             self.send("""%xt%EmpireEx_3%sei%1%{}%""")
+            self.send("""%xt%EmpireEx_3%gcs%1%{}%""")
             if self.details_cp is not None:
                 self.send(f"""%xt%EmpireEx_3%gaa%1%{{"KID":0,"AX1":{self.details_cp[1] // 13 * 13},"AY1":{self.details_cp[2] // 13 * 13},"AX2":{12 + self.details_cp[1] // 13 * 13},"AY2":{12 + self.details_cp[2] // 13 * 13}}}%""")
             time.sleep(60)
@@ -69,6 +70,18 @@ class MainSocket(websocket.WebSocketApp):
                         time.sleep(1)
                     self.send("""%xt%EmpireEx_3%glt%1%{"GST":3}%""")
                     self.temp_serveur = ["LACIS", event["TSID"]]
+                elif event["EID"] == 117 and event.get("FTDC") == 1:
+                    self.send("""%xt%EmpireEx_3%ftl%1%{}%""")
+                elif event["EID"] == 15 and event.get("OP") is not None and event.get("OP")[0] < 3:
+                    self.send("""%xt%EmpireEx_3%lws%1%{"LWET":0}%""")
+        elif message[:12] == "%xt%gcs%1%0%":
+            data = json.loads(message[12:-1])
+            if data["CHR"][0]["FOA"] > 0:
+                self.send("""%xt%EmpireEx_3%sct%1%{"CID":1,"OID":6001,"IF":1}%""")
+            elif data["CHR"][1]["FOA"] > 0:
+                self.send("""%xt%EmpireEx_3%sct%1%{"CID":2,"OID":6002,"IF":1}%""")
+            elif data["CHR"][2]["FOA"] > 0:
+                self.send("""%xt%EmpireEx_3%sct%1%{"CID":3,"OID":6003,"IF":1}%""")
         elif message[:12] == "%xt%soe%1%0%":
             data = message.split("%")
             if int(data[7]) > 30:
