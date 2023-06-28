@@ -16,6 +16,8 @@ class MainSocket(websocket.WebSocketApp):
         self.mdp = mdp
         self.details_cp = None
         self.dernier_gaa = -1
+        self.roue = -1
+        self.voyante = -1
         self.coms_en_mouvement = []
         self.attaques_en_cours = []
         self.temp_serveur = None
@@ -71,9 +73,15 @@ class MainSocket(websocket.WebSocketApp):
                     self.send("""%xt%EmpireEx_3%glt%1%{"GST":3}%""")
                     self.temp_serveur = ["LACIS", event["TSID"]]
                 elif event["EID"] == 117 and event.get("FTDC") == 1:
-                    self.send("""%xt%EmpireEx_3%ftl%1%{}%""")
+                    now = int(time.time())
+                    if now > self.voyante + 30:
+                        self.voyante = now
+                        self.send("""%xt%EmpireEx_3%ftl%1%{}%""")
                 elif event["EID"] == 15 and event.get("OP") is not None and event.get("OP")[0] < 3:
-                    self.send("""%xt%EmpireEx_3%lws%1%{"LWET":0}%""")
+                    now = int(time.time())
+                    if now > self.roue + 30:
+                        self.roue = now
+                        self.send("""%xt%EmpireEx_3%lws%1%{"LWET":0}%""")
         elif message[:12] == "%xt%gcs%1%0%":
             data = json.loads(message[12:-1])
             if data["CHR"][0]["FOA"] > 0:
