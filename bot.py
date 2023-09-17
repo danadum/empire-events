@@ -49,48 +49,32 @@ class Bot(commands.Bot):
     async def checkVersions(self):
         now = int(time.time())
         for fichier in list(self.base.get("/datamine", None).items()):
-            version = getVersion(fichier[0])
             version_old = fichier[1]["version"]
+            version = getVersion(fichier[0])
             if version != version_old:
-                if fichier[0].startswith("text"):
-                    old = requests.get(f"https://langserv.public.ggs-ep.com/12@{version_old}/en/*")
-                    old = json.dumps(old.json(), indent=4, ensure_ascii=False).split('\n')
-
-                    new = requests.get(f"https://langserv.public.ggs-ep.com/12@{version}/en/*")
-                    new = json.dumps(new.json(), indent=4, ensure_ascii=False).split('\n')
-
-                    comp = '\n'.join([*unified_diff(old, new, n=0)])
-                elif fichier[0].startswith("dll"):
-                    old = requests.get(f"https://empire-html5.goodgamestudios.com/default/dll/ggs.dll.{version_old}.js")
-                    match = re.search(r"ItemVersions.prototype.fill=function\(\){(.*)},ItemVersions}", old.text)
-                    old = match.group(1).replace(';', ',').split(',')
+                old = requests.get(fichier[1]['lien'].format(version=version_old))
+                new = requests.get(fichier[1]['lien'].format(version=version))
+                if fichier[0].startswith("dll"):
+                    old = old.text.split("ItemVersions.prototype.fill=function(){", 1)[1].split("}", 1)[0].replace(';', ',').split(',')
                     old = [f"    {line}" for line in old]
-
-                    new = requests.get(f"https://empire-html5.goodgamestudios.com/default/dll/ggs.dll.{version}.js")
-                    match = re.search(r"ItemVersions.prototype.fill=function\(\){(.*)},ItemVersions}", new.text)
-                    new = match.group(1).replace(';', ',').split(',')
+                    new = new.text.split("ItemVersions.prototype.fill=function(){", 1)[1].split("}", 1)[0].replace(';', ',').split(',')
                     new = [f"    {line}" for line in new]
-
                     comp = '\n'.join([*unified_diff(old, new, n=0)])
-                    comp = re.sub(r"this\.assets\.([^=]*)=\"(.*)\"", lambda x: f"{x.group(1)} = https://empire-html5.goodgamestudios.com/default/assets/{x.group(2)}.webp", comp)
+                    server = 'default' if fichier[0] == 'dll' else 'openBeta'
+                    comp = re.sub(r"this\.assets\.([^=]*)=\"(.*)\"", lambda x: f"{x.group(1)} = https://empire-html5.goodgamestudios.com/{server}/assets/{x.group(2)}.webp", comp)
                     for line in comp.split('\n'):
                         if line.startswith('+    ') or line.startswith('-    '):
                             action = "ajoutée" if line.startswith("+") else "supprimée"
-                            name = line.split("    ")[1].split("=")[0]
-                            url = line.split("=")[1]
+                            name = line.split("    ", 1)[1].split(" = ", 1)[0]
+                            url = line.split(" = ", 1)[1]
                             message = f"Image {action} à <t:{now}:T> le <t:{now}:D> dans la version {version} {fichier[1]['nom']} :\n[{name}](<{url}>)"
-                            async with aiohttp.ClientSession() as session:
-                                async with session.get(url) as response:
-                                    image = await response.read()
-                                    with io.BytesIO(image) as file:
-                                        await self.get_channel(self.channel_datamine2).send(message, file=discord.File(file, url.split("/")[-1]))
+                            async with aiohttp.ClientSession().get(url) as response:
+                                image = await response.read()
+                                with io.BytesIO(image) as file:
+                                    await self.get_channel(self.channel_datamine2).send(message, file=discord.File(file, url.split("/")[-1]))
                 else:
-                    old = requests.get(f"https://empire-html5.goodgamestudios.com/default/items/items_v{version_old}.json")
                     old = json.dumps(old.json(), indent=4, ensure_ascii=False).split('\n')
-
-                    new = requests.get(f"https://empire-html5.goodgamestudios.com/default/items/items_v{version}.json")
                     new = json.dumps(new.json(), indent=4, ensure_ascii=False).split('\n')
-
                     comp = '\n'.join([*unified_diff(old, new, n=0)])
                 await self.get_channel(self.channel_datamine).send(
                     f"La version {fichier[1]['nom']} a changé à <t:{now}:T> le <t:{now}:D> !\n"
