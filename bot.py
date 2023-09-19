@@ -76,7 +76,7 @@ class Bot(commands.Bot):
                 else:
                     old = await getJsonFile(fichier[1]['lien'].format(version=version_old))
                     old = json.dumps(old, indent=4, ensure_ascii=False).split('\n')
-                    new = await getTextFile(fichier[1]['lien'].format(version=version))
+                    new = await getJsonFile(fichier[1]['lien'].format(version=version))
                     new = json.dumps(new, indent=4, ensure_ascii=False).split('\n')
                     comp = '\n'.join([*unified_diff(old, new, n=0)])
                 await self.get_channel(self.channel_datamine).send(
