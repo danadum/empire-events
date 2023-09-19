@@ -26,8 +26,7 @@ class Bot(commands.Bot):
         async def on_ready():
             logging.error(f"### [{datetime.now()}] Bot running ###")
             donnees_version = await getVersion("item")
-            response = await getFile(f"https://empire-html5.goodgamestudios.com/default/items/items_v{donnees_version}.json")
-            self.donnees = await response.json()
+            self.donnees = await getJsonFile(f"https://empire-html5.goodgamestudios.com/default/items/items_v{donnees_version}.json")
             self.mainLoop.start()
 
         @self.command(name="versions")
@@ -53,12 +52,12 @@ class Bot(commands.Bot):
             version_old = fichier[1]["version"]
             version = await getVersion(fichier[0])
             if version != version_old:
-                old = await getFile(fichier[1]['lien'].format(version=version_old))
-                new = await getFile(fichier[1]['lien'].format(version=version))
                 if fichier[0].startswith("dll"):
-                    old = (await old.text()).split("ItemVersions.prototype.fill=function(){", 1)[1].split("}", 1)[0].replace(';', ',').split(',')
+                    old = await getTextFile(fichier[1]['lien'].format(version=version_old))
+                    old = old.split("ItemVersions.prototype.fill=function(){", 1)[1].split("}", 1)[0].replace(';', ',').split(',')
                     old = [f"    {line}" for line in old]
-                    new = (await new.text()).split("ItemVersions.prototype.fill=function(){", 1)[1].split("}", 1)[0].replace(';', ',').split(',')
+                    new = await getTextFile(fichier[1]['lien'].format(version=version))
+                    new = new.split("ItemVersions.prototype.fill=function(){", 1)[1].split("}", 1)[0].replace(';', ',').split(',')
                     new = [f"    {line}" for line in new]
                     comp = '\n'.join([*unified_diff(old, new, n=0)])
                     server = 'default' if fichier[0] == 'dll' else 'openBeta'
@@ -75,8 +74,10 @@ class Bot(commands.Bot):
                                     with io.BytesIO(image) as file:
                                         await self.get_channel(self.channel_datamine2).send(message, file=discord.File(file, url.split("/")[-1]))
                 else:
-                    old = json.dumps(await old.json(), indent=4, ensure_ascii=False).split('\n')
-                    new = json.dumps(await new.json(), indent=4, ensure_ascii=False).split('\n')
+                    old = await getJsonFile(fichier[1]['lien'].format(version=version_old))
+                    old = json.dumps(old, indent=4, ensure_ascii=False).split('\n')
+                    new = await getTextFile(fichier[1]['lien'].format(version=version))
+                    new = json.dumps(new, indent=4, ensure_ascii=False).split('\n')
                     comp = '\n'.join([*unified_diff(old, new, n=0)])
                 await self.get_channel(self.channel_datamine).send(
                     f"La version {fichier[1]['nom']} a changé à <t:{now}:T> le <t:{now}:D> !\n"
@@ -200,7 +201,13 @@ async def getVersion(fichier):
                 return re.findall("(?<=dll/ggs[.]dll[.]).*?(?=[.]js)", await response.text())[0]
 
 
-async def getFile(url):
+async def getJsonFile(url):
     async with aiohttp.ClientSession() as session:
         async with session.get(url) as response:
-            return response
+            return await response.json()
+
+
+async def getTextFile(url):
+    async with aiohttp.ClientSession() as session:
+        async with session.get(url) as response:
+            return await response.text()
