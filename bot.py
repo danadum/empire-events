@@ -2,7 +2,6 @@ import logging
 from datetime import datetime
 import time
 import re
-import requests
 import discord
 from discord.ext import commands, tasks
 import json
@@ -15,18 +14,20 @@ class Bot(commands.Bot):
     def __init__(self, prefix, base):
         super().__init__(prefix, intents=discord.Intents.all())
         self.base = base
-        donnees_version = requests.get("https://empire-html5.goodgamestudios.com/default/items/ItemsVersion.properties").text.split("=")[1]
-        self.donnees = requests.get(f"https://empire-html5.goodgamestudios.com/default/items/items_v{donnees_version}.json").json()
         self.channel_fr = 774929943540006952
         self.channel_en = 956915826894708766
         self.channel_log = 1076865424295219251
         self.channel_datamine = 1069667390402592788
         self.channel_datamine2 = 1070755471679570021
         self.server_fr = 481447341849706496
+        self.donnees = {}
 
         @self.event
         async def on_ready():
             logging.error(f"### [{datetime.now()}] Bot running ###")
+            donnees_version = await getVersion("item")
+            response = await getFile(f"https://empire-html5.goodgamestudios.com/default/items/items_v{donnees_version}.json")
+            self.donnees = await response.json()
             self.mainLoop.start()
 
         @self.command(name="versions")
@@ -34,7 +35,7 @@ class Bot(commands.Bot):
             if ctx.channel.id == self.channel_datamine or ctx.guild.id != self.server_fr:
                 lines = []
                 for fichier in list(self.base.get("/datamine", None).items()):
-                    version = getVersion(fichier[0])
+                    version = await getVersion(fichier[0])
                     lines.append(f"Version actuelle {fichier[1]['nom']} : [{version}](<{fichier[1]['lien'].format(version=version)}>)")
                 await ctx.send("\n".join(lines))
 
@@ -50,14 +51,14 @@ class Bot(commands.Bot):
         now = int(time.time())
         for fichier in list(self.base.get("/datamine", None).items()):
             version_old = fichier[1]["version"]
-            version = getVersion(fichier[0])
+            version = await getVersion(fichier[0])
             if version != version_old:
-                old = requests.get(fichier[1]['lien'].format(version=version_old))
-                new = requests.get(fichier[1]['lien'].format(version=version))
+                old = await getFile(fichier[1]['lien'].format(version=version_old))
+                new = await getFile(fichier[1]['lien'].format(version=version))
                 if fichier[0].startswith("dll"):
-                    old = old.text.split("ItemVersions.prototype.fill=function(){", 1)[1].split("}", 1)[0].replace(';', ',').split(',')
+                    old = (await old.text()).split("ItemVersions.prototype.fill=function(){", 1)[1].split("}", 1)[0].replace(';', ',').split(',')
                     old = [f"    {line}" for line in old]
-                    new = new.text.split("ItemVersions.prototype.fill=function(){", 1)[1].split("}", 1)[0].replace(';', ',').split(',')
+                    new = (await new.text()).split("ItemVersions.prototype.fill=function(){", 1)[1].split("}", 1)[0].replace(';', ',').split(',')
                     new = [f"    {line}" for line in new]
                     comp = '\n'.join([*unified_diff(old, new, n=0)])
                     server = 'default' if fichier[0] == 'dll' else 'openBeta'
@@ -68,13 +69,14 @@ class Bot(commands.Bot):
                             name = line.split("    ", 1)[1].split(" = ", 1)[0]
                             url = line.split(" = ", 1)[1]
                             message = f"Image {action} à <t:{now}:T> le <t:{now}:D> dans la version {version} {fichier[1]['nom']} :\n[{name}](<{url}>)"
-                            async with aiohttp.ClientSession().get(url) as response:
-                                image = await response.read()
-                                with io.BytesIO(image) as file:
-                                    await self.get_channel(self.channel_datamine2).send(message, file=discord.File(file, url.split("/")[-1]))
+                            async with aiohttp.ClientSession() as session:
+                                async with session.get(url) as response:
+                                    image = await response.read()
+                                    with io.BytesIO(image) as file:
+                                        await self.get_channel(self.channel_datamine2).send(message, file=discord.File(file, url.split("/")[-1]))
                 else:
-                    old = json.dumps(old.json(), indent=4, ensure_ascii=False).split('\n')
-                    new = json.dumps(new.json(), indent=4, ensure_ascii=False).split('\n')
+                    old = json.dumps(await old.json(), indent=4, ensure_ascii=False).split('\n')
+                    new = json.dumps(await new.json(), indent=4, ensure_ascii=False).split('\n')
                     comp = '\n'.join([*unified_diff(old, new, n=0)])
                 await self.get_channel(self.channel_datamine).send(
                     f"La version {fichier[1]['nom']} a changé à <t:{now}:T> le <t:{now}:D> !\n"
@@ -170,28 +172,35 @@ class Bot(commands.Bot):
             return f"<@&841978439329644606> Promo de {event[1]['contenu']}%", f"<@&841978439329644606> Prime time of {event[1]['contenu']}%"
 
 
-def getVersion(fichier):
-    if fichier == "item":
-        response = requests.get("https://empire-html5.goodgamestudios.com/default/items/ItemsVersion.properties")
-        return response.text.split("=")[1]
-    elif fichier == "item_test":
-        response = requests.get("https://empire-html5.goodgamestudios.com/openBeta/items/ItemsVersion.properties")
-        return response.text.split("=")[1]
-    elif fichier == "text":
-        response = requests.get("https://langserv.public.ggs-ep.com/12/fr/@metadata")
-        return str(response.json()["@metadata"]["versionNo"])
-    elif fichier == "text_dev":
-        response = requests.get("https://langserv-dev.public.ggs-ep.com/12/fr/@metadata")
-        return str(response.json()["@metadata"]["versionNo"])
-    elif fichier == "text_api":
-        response = requests.get("https://translations-api-live.public.ggs-ep.com/12/fr/versionNo")
-        return str(response.json()["versionNo"])
-    elif fichier == "text_api_test":
-        response = requests.get("https://translations-api-test.public.ggs-ep.com/12/fr/versionNo")
-        return str(response.json()["versionNo"])
-    elif fichier == "dll":
-        response = requests.get("https://empire-html5.goodgamestudios.com/default/index.html")
-        return re.findall("(?<=dll/ggs[.]dll[.]).*?(?=[.]js)", response.text)[0]
-    elif fichier == "dll_test":
-        response = requests.get("https://empire-html5.goodgamestudios.com/openBeta/index.html")
-        return re.findall("(?<=dll/ggs[.]dll[.]).*?(?=[.]js)", response.text)[0]
+async def getVersion(fichier):
+    async with aiohttp.ClientSession() as session:
+        if fichier == "item":
+            async with session.get("https://empire-html5.goodgamestudios.com/default/items/ItemsVersion.properties") as response:
+                return (await response.text()).split("=")[1]
+        elif fichier == "item_test":
+            async with session.get("https://empire-html5.goodgamestudios.com/openBeta/items/ItemsVersion.properties") as response:
+                return (await response.text()).split("=")[1]
+        elif fichier == "text":
+            async with session.get("https://langserv.public.ggs-ep.com/12/fr/@metadata") as response:
+                return str((await response.json())["@metadata"]["versionNo"])
+        elif fichier == "text_dev":
+            async with session.get("https://langserv-dev.public.ggs-ep.com/12/fr/@metadata") as response:
+                return str((await response.json())["@metadata"]["versionNo"])
+        elif fichier == "text_api":
+            async with session.get("https://translations-api-live.public.ggs-ep.com/12/fr/versionNo") as response:
+                return str((await response.json())["versionNo"])
+        elif fichier == "text_api_test":
+            async with session.get("https://translations-api-test.public.ggs-ep.com/12/fr/versionNo") as response:
+                return str((await response.json())["versionNo"])
+        elif fichier == "dll":
+            async with session.get("https://empire-html5.goodgamestudios.com/default/index.html") as response:
+                return re.findall("(?<=dll/ggs[.]dll[.]).*?(?=[.]js)", await response.text())[0]
+        elif fichier == "dll_test":
+            async with session.get("https://empire-html5.goodgamestudios.com/openBeta/index.html") as response:
+                return re.findall("(?<=dll/ggs[.]dll[.]).*?(?=[.]js)", await response.text())[0]
+
+
+async def getFile(url):
+    async with aiohttp.ClientSession() as session:
+        async with session.get(url) as response:
+            return response
