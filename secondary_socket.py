@@ -3,6 +3,7 @@ from datetime import datetime
 from threading import Thread
 import time
 import websocket
+import json
 
 
 class SecondarySocket(websocket.WebSocketApp):
@@ -31,14 +32,14 @@ class SecondarySocket(websocket.WebSocketApp):
 
     def on_message(self, ws, message):
         message = message.decode('UTF-8')
-        if message[:12] == "%xt%soe%1%0%":
-            data = message.split("%")
-            if int(data[7]) > 30:
-                temps = int(data[7]) + int(time.time())
+        if message[:17] == "%xt%core_poe%1%0%":
+            data = json.loads(message[17:-1])
+            if data["remainingTime"] > 30 and int(data["type"]) == 1:
+                temps = data["remainingTime"] + int(time.time())
                 identifier = 998 if self.type_serveur == "RE" else 997
                 old_event = self.base.get(f"/events/{identifier}", None)
-                if old_event["temps"] < int(time.time()) or old_event["contenu"] != data[5]:
-                    self.base.patch(f"/events/{identifier}", {"temps": temps, "contenu": data[5], "reduction": 0, "nouveau": 1})
+                if old_event["temps"] < int(time.time()) or old_event["contenu"] != data["bonusPremium"]:
+                    self.base.patch(f"/events/{identifier}", {"temps": temps, "contenu": data["bonusPremium"], "reduction": 0, "nouveau": 1})
 
     def on_error(self, ws, error):
         logging.error("### error in secondary socket ###")

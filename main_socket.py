@@ -90,13 +90,13 @@ class MainSocket(websocket.WebSocketApp):
                 self.send("""%xt%EmpireEx_3%sct%1%{"CID":2,"OID":6002,"IF":1}%""")
             elif data["CHR"][2]["FOA"] > 0:
                 self.send("""%xt%EmpireEx_3%sct%1%{"CID":3,"OID":6003,"IF":1}%""")
-        elif message[:12] == "%xt%soe%1%0%":
-            data = message.split("%")
-            if int(data[7]) > 30:
-                temps = int(data[7]) + int(time.time())
+        elif message[:17] == "%xt%core_poe%1%0%":
+            data = json.loads(message[17:-1])
+            if data["remainingTime"] > 30 and data["type"] == 1:
+                temps = data["remainingTime"] + int(time.time())
                 old_event = self.base.get("/events/999", None)
-                if old_event["temps"] < int(time.time()) or old_event["contenu"] != data[5]:
-                    self.base.patch("/events/999", {"temps": temps, "contenu": data[5], "reduction": 0, "nouveau": 1})
+                if old_event["temps"] < int(time.time()) or old_event["contenu"] != data["bonusPremium"]:
+                    self.base.patch("/events/999", {"temps": temps, "contenu": data["bonusPremium"], "reduction": 0, "nouveau": 1})
         elif message[:12] == "%xt%glt%1%0%":
             data = json.loads(message[12:-1])
             self.temp_socket = SecondarySocket(f"wss://{data['TSIP']}", self.base, data["TSZ"], data["TLT"], self.temp_serveur[0], self)
