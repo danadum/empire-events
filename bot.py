@@ -43,8 +43,10 @@ class Bot(commands.Bot):
                             building = next(filter(lambda obj: str(obj["wodID"]) == event[1]["contenu"], self.donnees["buildings"]))
                             cout = int(int(building["costC2"]) * (1 - (event[1]["reduction"] / 100)))
                             noms = f"{noms[0]} (le nouveau coût est de {cout} rubis)", f"{noms[1]} (the new cost is {cout} rubies)"
-                    await self.get_channel(self.channel_fr).send(f"{noms[0]}, fin à <t:{event[1]['temps']}:t> (<t:{event[1]['temps']}:R>)")
-                    await self.get_channel(self.channel_en).send(f"{noms[1]}, ends at <t:{event[1]['temps']}:t> (<t:{event[1]['temps']}:R>)")
+                    message = await self.get_channel(self.channel_fr).send(f"{noms[0]}, fin à <t:{event[1]['temps']}:t> (<t:{event[1]['temps']}:R>)")
+                    await message.publish()
+                    message = await self.get_channel(self.channel_en).send(f"{noms[1]}, ends at <t:{event[1]['temps']}:t> (<t:{event[1]['temps']}:R>)")
+                    await message.publish()
                     self.base.patch(f"/events/{event[0]}", {"nouveau": 0})
 
     def get_nom_event(self, event):
