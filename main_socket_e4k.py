@@ -6,9 +6,10 @@ from threading import Thread
 import time
 import websocket
 from secondary_socket import SecondarySocket
+import traceback
 
 
-class MainSocket(websocket.WebSocketApp):
+class MainSocketE4K(websocket.WebSocketApp):
     def __init__(self, url, base, nom, mdp):
         super().__init__(url, on_open=self.on_open, on_message=self.on_message, on_error=self.on_error, on_close=self.on_close)
         self.base = base
@@ -28,23 +29,24 @@ class MainSocket(websocket.WebSocketApp):
         time.sleep(1)
         self.send("""<msg t='sys'><body action='verChk' r='0'><ver v='166' /></body></msg>""")
         self.send("""<msg t='sys'><body action='autoJoin' r='-1'></body></msg>""")
-        self.send("""<msg t='sys'><body action='login' r='0'><login z='EmpireEx_3'><nick><![CDATA[]]></nick><pword><![CDATA[1065004%fr%0]]></pword></login></body></msg>""")
-        self.send(f"""%xt%EmpireEx_3%lli%1%{{"CONM":175,"RTM":24,"ID":0,"PL":1,"NOM":"{self.nom}","PW":"{self.mdp}","LT":null,"LANG":"fr","DID":"0","AID":"1674256959939529708","KID":"","REF":"https://empire.goodgamestudios.com","GCI":"","SID":9,"PLFID":1}}%""")
+        self.send("""<msg t='sys'><body action='login' r='0'><login z='EmpirefourkingdomsExGG_34'><nick><![CDATA[]]></nick><pword><![CDATA[1065004%fr%0]]></pword></login></body></msg>""")
+        self.send(f"""%xt%EmpirefourkingdomsExGG_34%core_lga%1%{{"NM": "{self.nom}", "PW": "{self.mdp}", "L": "fr", "AID": "1674256959939529708", "DID": 5, "PLFID": "3", "ADID": "null", "AFUID": "appsFlyerUID", "IDFV": "null"}}%""")
 
     def run(self):
         while self.sock is not None:
-            self.send("""%xt%EmpireEx_3%pin%1%<RoundHouseKick>%""")
-            self.send("""%xt%EmpireEx_3%sei%1%{}%""")
-            self.send("""%xt%EmpireEx_3%gcs%1%{}%""")
+            self.send("""%xt%EmpirefourkingdomsExGG_34%pin%1%<RoundHouseKick>%""")
+            self.send("""%xt%EmpirefourkingdomsExGG_34%sei%1%{}%""")
+            self.send("""%xt%EmpirefourkingdomsExGG_34%gcs%1%{}%""")
             if self.details_cp is not None:
-                self.send(f"""%xt%EmpireEx_3%gaa%1%{{"KID":0,"AX1":{self.details_cp[1] // 13 * 13},"AY1":{self.details_cp[2] // 13 * 13},"AX2":{12 + self.details_cp[1] // 13 * 13},"AY2":{12 + self.details_cp[2] // 13 * 13}}}%""")
+                self.send(f"""%xt%EmpirefourkingdomsExGG_34%gaa%1%{{"KID":0,"AX1":{self.details_cp[1] // 13 * 13},"AY1":{self.details_cp[2] // 13 * 13},"AX2":{12 + self.details_cp[1] // 13 * 13},"AY2":{12 + self.details_cp[2] // 13 * 13}}}%""")
             time.sleep(60)
 
     def on_message(self, ws, message):
         message = message.decode('UTF-8')
-        if message[:12] == "%xt%lli%1%0%":
+        print(message, message[15:20])
+        if message[:20] == "%xt%core_lga%1%10005%":
             Thread(target=self.run).start()
-        elif message[:10] == "%xt%lli%1%" and message[10] != "0":
+        elif message[:10] == "%xt%core_lga%1%" and message[15:20] != "10005":
             self.close()
         elif message[:12] == "%xt%sei%1%0%":
             data = json.loads(message[12:-1])
@@ -53,53 +55,56 @@ class MainSocket(websocket.WebSocketApp):
                     temps = int(event['RS']) + int(time.time())
                     contenu = str(event.get("WID") or event.get("BID") or event.get("TID"))
                     reduction = event.get('DIS') or 0
-                    old_event = self.base.get(f"/events/{event['EID']}", None)
+                    old_event = self.base.get(f"/events-e4k/{event['EID']}", None)
                     if old_event["temps"] < int(time.time()) or old_event["contenu"] != contenu or old_event["reduction"] != reduction:
-                        self.base.patch(f"/events/{event['EID']}", {"temps": temps, "contenu": contenu, "reduction": reduction, "nouveau": 1})
+                        self.base.patch(f"/events-e4k/{event['EID']}", {"temps": temps, "contenu": contenu, "reduction": reduction, "nouveau": 1})
                 elif event["EID"] == 106 and self.temp_serveur != ["RE", event["TSID"]]:
                     if event["IPS"] == 0:
                         if event["TSID"] == 16:
-                            self.send("""%xt%EmpireEx_3%sbp%1%{"PID":2358,"BT":0,"TID":106,"AMT":1,"KID":0,"AID":-1,"PC2":-1,"BA":0,"PWR":0,"_PO":-1}%""")
-                            self.send("""%xt%EmpireEx_3%tsc%1%{"ID":40,"OC2":0,"PWR":0,"GST":2}%""")
+                            self.send("""%xt%EmpirefourkingdomsExGG_34%sbp%1%{"PID":2358,"BT":0,"TID":106,"AMT":1,"KID":0,"AID":-1,"PC2":-1,"BA":0,"PWR":0,"_PO":-1}%""")
+                            self.send("""%xt%EmpirefourkingdomsExGG_34%tsc%1%{"ID":40,"OC2":0,"PWR":0,"GST":2}%""")
                         else:
-                            self.send("""%xt%EmpireEx_3%tsc%1%{"ID":31,"OC2":1,"PWR":0,"GST":2}%""")
+                            self.send("""%xt%EmpirefourkingdomsExGG_34%tsc%1%{"ID":31,"OC2":1,"PWR":0,"GST":2}%""")
                         time.sleep(1)
-                    self.send("""%xt%EmpireEx_3%glt%1%{"GST":2}%""")
+                    self.send("""%xt%EmpirefourkingdomsExGG_34%glt%1%{"GST":2}%""")
                     self.temp_serveur = ["RE", event["TSID"]]
                 elif event["EID"] == 113 and self.temp_serveur != ["LACIS", event["TSID"]]:
                     if event["IPS"] == 0:
-                        self.send("""%xt%EmpireEx_3%tsc%1%{"ID":34,"OC2":1,"PWR":0,"GST":3}%""")
+                        self.send("""%xt%EmpirefourkingdomsExGG_34%tsc%1%{"ID":34,"OC2":1,"PWR":0,"GST":3}%""")
                         time.sleep(1)
-                    self.send("""%xt%EmpireEx_3%glt%1%{"GST":3}%""")
+                    self.send("""%xt%EmpirefourkingdomsExGG_34%glt%1%{"GST":3}%""")
                     self.temp_serveur = ["LACIS", event["TSID"]]
                 elif event["EID"] == 117 and event.get("FTDC") == 1:
                     now = int(time.time())
                     if now > self.voyante + 30:
                         self.voyante = now
-                        self.send("""%xt%EmpireEx_3%ftl%1%{}%""")
+                        self.send("""%xt%EmpirefourkingdomsExGG_34%ftl%1%{}%""")
                 elif event["EID"] == 15 and event.get("OP") is not None and event.get("OP")[0] < 3:
                     now = int(time.time())
                     if now > self.roue + 30:
                         self.roue = now
-                        self.send("""%xt%EmpireEx_3%lws%1%{"LWET":0}%""")
+                        self.send("""%xt%EmpirefourkingdomsExGG_34%lws%1%{"LWET":0}%""")
         elif message[:12] == "%xt%gcs%1%0%":
             data = json.loads(message[12:-1])
             if data["CHR"][0]["FOA"] > 0:
-                self.send("""%xt%EmpireEx_3%sct%1%{"CID":1,"OID":6001,"IF":1}%""")
+                self.send("""%xt%EmpirefourkingdomsExGG_34%sct%1%{"CID":1,"OID":6001,"IF":1}%""")
             elif data["CHR"][1]["FOA"] > 0:
-                self.send("""%xt%EmpireEx_3%sct%1%{"CID":2,"OID":6002,"IF":1}%""")
+                self.send("""%xt%EmpirefourkingdomsExGG_34%sct%1%{"CID":2,"OID":6002,"IF":1}%""")
             elif data["CHR"][2]["FOA"] > 0:
-                self.send("""%xt%EmpireEx_3%sct%1%{"CID":3,"OID":6003,"IF":1}%""")
+                self.send("""%xt%EmpirefourkingdomsExGG_34%sct%1%{"CID":3,"OID":6003,"IF":1}%""")
         elif message[:17] == "%xt%core_poe%1%0%":
             data = json.loads(message[17:-1])
             if data["remainingTime"] > 30 and data["type"] == 1:
                 temps = data["remainingTime"] + int(time.time())
-                old_event = self.base.get("/events/999", None)
+                old_event = self.base.get("/events-e4k/999", None)
                 if old_event["temps"] < int(time.time()) or old_event["contenu"] != data["bonusPremium"]:
-                    self.base.patch("/events/999", {"temps": temps, "contenu": data["bonusPremium"], "reduction": 0, "nouveau": 1})
+                    self.base.patch("/events-e4k/999", {"temps": temps, "contenu": data["bonusPremium"], "reduction": 0, "nouveau": 1})
         elif message[:12] == "%xt%glt%1%0%":
             data = json.loads(message[12:-1])
-            self.temp_socket = SecondarySocket(f"wss://{data['TSIP']}", self.base, data["TSZ"], data["TLT"], self.temp_serveur[0], self, "/events")
+            if data['TSIP'].startswith('e4k'):
+                self.temp_socket = SecondarySocket(f"ws://{data['TSIP']}", self.base, data["TSZ"], data["TLT"], self.temp_serveur[0], self, "/events-e4k")
+            else:
+                self.temp_socket = SecondarySocket(f"wss://{data['TSIP']}", self.base, data["TSZ"], data["TLT"], self.temp_serveur[0], self, "/events-e4k")
             Thread(target=self.temp_socket.run_forever, kwargs={'reconnect': False}).start()
         elif message[:12] == "%xt%gbd%1%0%":
             data = json.loads(message[12:-1])
@@ -132,21 +137,22 @@ class MainSocket(websocket.WebSocketApp):
                 vague = f"""{{"L":{{"T":[],"U":[[{type_soldats},{limite_flanc}]]}},"R":{{"T":[],"U":[[{type_soldats},{limite_flanc}]]}},"M":{{"T":[],"U":[]}}}}"""
                 vagues = f"""[{",".join(1 * [vague])}]"""
                 cour = f"""[[{type_soldats},{100 + level}]]"""
-                attaque = f"""%xt%EmpireEx_3%cra%1%{{"SX":{self.details_cp[1]},"SY":{self.details_cp[2]},"TX":{data["gaa"]["AI"][1]},"TY":{data["gaa"]["AI"][2]},"KID":0,"LID":{commandant["ID"]},"WT":0,"HBW":1007,"BPC":0,"ATT":0,"AV":0,"LP":0,"FC":0,"PTT":0,"SD":0,"ICA":0,"CD":99,"A":{vagues},"BKS":[],"AST":[],"RW":{cour}}}%"""
+                attaque = f"""%xt%EmpirefourkingdomsExGG_34%cra%1%{{"SX":{self.details_cp[1]},"SY":{self.details_cp[2]},"TX":{data["gaa"]["AI"][1]},"TY":{data["gaa"]["AI"][2]},"KID":0,"LID":{commandant["ID"]},"WT":0,"HBW":1007,"BPC":0,"ATT":0,"AV":0,"LP":0,"FC":0,"PTT":0,"SD":0,"ICA":0,"CD":99,"A":{vagues},"BKS":[],"AST":[],"RW":{cour}}}%"""
                 logging.error(attaque)
                 self.send(attaque)
 
     def launch_attacks(self, data):
         for map_object in data["AI"]:
             if len(map_object) == 7 and map_object[0] == 2 and map_object[5] < 0:
-                self.send("""%xt%EmpireEx_3%gam%1%{}%""")
+                self.send("""%xt%EmpirefourkingdomsExGG_34%gam%1%{}%""")
                 time.sleep(1)
                 if next(filter(lambda fc: fc[1] == map_object[1] and fc[2] == map_object[2], self.attaques_en_cours), None) is None:
-                    self.send(f"""%xt%EmpireEx_3%adi%1%{{"SX":{self.details_cp[1]},"SY":{self.details_cp[2]},"TX":{map_object[1]},"TY":{map_object[2]},"KID":0}}%""")
+                    self.send(f"""%xt%EmpirefourkingdomsExGG_34%adi%1%{{"SX":{self.details_cp[1]},"SY":{self.details_cp[2]},"TX":{map_object[1]},"TY":{map_object[2]},"KID":0}}%""")
                     time.sleep(5)
 
     def on_error(self, ws, error):
         logging.error("### error in main socket ###")
+        print(traceback.format_exc())
         logging.error(error)
         self.close()
 

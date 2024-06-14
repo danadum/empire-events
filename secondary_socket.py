@@ -7,13 +7,14 @@ import json
 
 
 class SecondarySocket(websocket.WebSocketApp):
-    def __init__(self, url, base, header, token, type_serveur, main_socket):
+    def __init__(self, url, base, header, token, type_serveur, main_socket, folder):
         super().__init__(url, on_open=self.on_open, on_message=self.on_message, on_error=self.on_error, on_close=self.on_close)
         self.base = base
         self.header = header
         self.token = token
         self.type_serveur = type_serveur
         self.main_socket = main_socket
+        self.folder = folder
 
     def on_open(self, ws):
         logging.error(f"### [{datetime.now()}] Secondary socket connected ###")
@@ -37,9 +38,9 @@ class SecondarySocket(websocket.WebSocketApp):
             if data["remainingTime"] > 30 and int(data["type"]) == 1:
                 temps = data["remainingTime"] + int(time.time())
                 identifier = 998 if self.type_serveur == "RE" else 997
-                old_event = self.base.get(f"/events/{identifier}", None)
+                old_event = self.base.get(f"{self.folder}/{identifier}", None)
                 if old_event["temps"] < int(time.time()) or old_event["contenu"] != data["bonusPremium"]:
-                    self.base.patch(f"/events/{identifier}", {"temps": temps, "contenu": data["bonusPremium"], "reduction": 0, "nouveau": 1})
+                    self.base.patch(f"{self.folder}/{identifier}", {"temps": temps, "contenu": data["bonusPremium"], "reduction": 0, "nouveau": 1})
 
     def on_error(self, ws, error):
         logging.error("### error in secondary socket ###")

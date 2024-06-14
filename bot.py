@@ -12,6 +12,8 @@ class Bot(commands.Bot):
         self.base = base
         self.channel_fr = 774929943540006952
         self.channel_en = 956915826894708766
+        self.channel_e4k_fr = 956916103869792266
+        self.channel_e4k_en = 956915929982328892
         self.channel_log = 1076865424295219251
         self.server_fr = 481447341849706496
         self.donnees = {}
@@ -31,21 +33,31 @@ class Bot(commands.Bot):
     @tasks.loop(seconds=10)
     async def show_events(self):
         now = int(time.time())
-        new_events = [obj for obj in self.base.get("/events", None).items() if obj[1]["nouveau"] == 1]
-        await self.get_channel(self.channel_log).send(f"<t:{now}:t> {now} :\n{new_events}")
-        for event in new_events:
-            if event[1]["temps"] > now:
-                noms = self.get_nom_event(event)
-                if noms is not None:
-                    if event[1]["reduction"] != 0:
-                        noms = f"{noms[0]} Réduction de {event[1]['reduction']}%", f"{noms[1]} Discount of {event[1]['reduction']}%"
-                        if event[0] == "7":
-                            building = next(filter(lambda obj: str(obj["wodID"]) == event[1]["contenu"], self.donnees["buildings"]))
-                            cout = int(int(building["costC2"]) * (1 - (event[1]["reduction"] / 100)))
-                            noms = f"{noms[0]} (le nouveau coût est de {cout} rubis)", f"{noms[1]} (the new cost is {cout} rubies)"
-                    await self.get_channel(self.channel_fr).send(f"{noms[0]}, fin à <t:{event[1]['temps']}:t> (<t:{event[1]['temps']}:R>)")
-                    await self.get_channel(self.channel_en).send(f"{noms[1]}, ends at <t:{event[1]['temps']}:t> (<t:{event[1]['temps']}:R>)")
-                    self.base.patch(f"/events/{event[0]}", {"nouveau": 0})
+        for folder in ["/events", "/events-e4k"]:
+            new_events = [obj for obj in self.base.get(folder, None).items() if obj[1]["nouveau"] == 1]
+            await self.get_channel(self.channel_log).send(f"<t:{now}:t> {now} : {folder}\n{new_events}")
+            for event in new_events:
+                if event[1]["temps"] > now:
+                    noms = self.get_nom_event(event)
+                    if noms is not None:
+                        if event[1]["reduction"] != 0:
+                            noms = f"{noms[0]} Réduction de {event[1]['reduction']}%", f"{noms[1]} Discount of {event[1]['reduction']}%"
+                            if event[0] == "7":
+                                building = next(filter(lambda obj: str(obj["wodID"]) == event[1]["contenu"], self.donnees["buildings"]))
+                                cout = int(int(building["costC2"]) * (1 - (event[1]["reduction"] / 100)))
+                                noms = f"{noms[0]} (le nouveau coût est de {cout} rubis)", f"{noms[1]} (the new cost is {cout} rubies)"
+                        if folder == "/events":
+                            message = await self.get_channel(self.channel_fr).send(f"{noms[0]}, fin à <t:{event[1]['temps']}:t> (<t:{event[1]['temps']}:R>)")
+                            await message.publish()
+                            message = await self.get_channel(self.channel_en).send(f"{noms[1]}, ends at <t:{event[1]['temps']}:t> (<t:{event[1]['temps']}:R>)")
+                            await message.publish()
+                        else:
+                            message = await self.get_channel(self.channel_e4k_fr).send(f"{noms[0]}, fin à <t:{event[1]['temps']}:t> (<t:{event[1]['temps']}:R>)")
+                            await message.publish()
+                            message = await self.get_channel(self.channel_e4k_en).send(f"{noms[1]}, ends at <t:{event[1]['temps']}:t> (<t:{event[1]['temps']}:R>)")
+                            await message.publish()
+
+                        self.base.patch(f"{folder}/{event[0]}", {"nouveau": 0})
 
     def get_nom_event(self, event):
         if event[0] == "7":
