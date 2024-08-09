@@ -3,7 +3,8 @@ from datetime import datetime
 import time
 import discord
 from discord.ext import commands, tasks
-import aiohttp
+# import aiohttp
+import requests
 
 
 class Bot(commands.Bot):
@@ -16,14 +17,17 @@ class Bot(commands.Bot):
         self.channel_e4k_en = 956915929982328892
         self.channel_log = 1076865424295219251
         self.server_fr = 481447341849706496
-        self.donnees = {}
+        # self.donnees = {}
+        donnees_version = getItemVersionSync()
+        self.donnees = getJsonFileSync(f"https://empire-html5.goodgamestudios.com/default/items/items_v{donnees_version}.json")
 
         @self.event
         async def on_ready():
             logging.error(f"### [{datetime.now()}] Bot running ###")
-            donnees_version = await getItemVersion()
-            self.donnees = await getJsonFile(f"https://empire-html5.goodgamestudios.com/default/items/items_v{donnees_version}.json")
+            # donnees_version = await getItemVersion()
+            # self.donnees = await getJsonFile(f"https://empire-html5.goodgamestudios.com/default/items/items_v{donnees_version}.json")
             self.mainLoop.start()
+
 
     @tasks.loop(seconds=300)
     async def mainLoop(self):
@@ -137,8 +141,15 @@ async def getItemVersion():
         async with session.get("https://empire-html5.goodgamestudios.com/default/items/ItemsVersion.properties") as response:
             return (await response.text()).split("=")[1]
 
-
 async def getJsonFile(url):
     async with aiohttp.ClientSession() as session:
         async with session.get(url) as response:
             return await response.json()
+
+def getItemVersionSync():
+    with requests.get("https://empire-html5.goodgamestudios.com/default/items/ItemsVersion.properties") as response:
+        return response.text().split("=")[1]
+
+def getJsonFileSync(url):
+    with requests.get(url) as response:
+        return response.json()
