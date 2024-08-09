@@ -47,15 +47,20 @@ class Bot(commands.Bot):
                                 cout = int(int(building["costC2"]) * (1 - (event[1]["reduction"] / 100)))
                                 noms = f"{noms[0]} (le nouveau coût est de {cout} rubis)", f"{noms[1]} (the new cost is {cout} rubies)"
                         if folder == "/events":
-                            message = await self.get_channel(self.channel_fr).send(f"{noms[0]}, fin à <t:{event[1]['temps']}:t> (<t:{event[1]['temps']}:R>)")
-                            await message.publish()
-                            message = await self.get_channel(self.channel_en).send(f"{noms[1]}, ends at <t:{event[1]['temps']}:t> (<t:{event[1]['temps']}:R>)")
-                            await message.publish()
+                            message_fr = await self.get_channel(self.channel_fr).send(f"{noms[0]}, fin à <t:{event[1]['temps']}:t> (<t:{event[1]['temps']}:R>)")
+                            message_en = await self.get_channel(self.channel_en).send(f"{noms[1]}, ends at <t:{event[1]['temps']}:t> (<t:{event[1]['temps']}:R>)")
                         else:
-                            message = await self.get_channel(self.channel_e4k_fr).send(f"{noms[0]}, fin à <t:{event[1]['temps']}:t> (<t:{event[1]['temps']}:R>)")
-                            await message.publish()
-                            message = await self.get_channel(self.channel_e4k_en).send(f"{noms[1]}, ends at <t:{event[1]['temps']}:t> (<t:{event[1]['temps']}:R>)")
-                            await message.publish()
+                            message_fr = await self.get_channel(self.channel_e4k_fr).send(f"{noms[0]}, fin à <t:{event[1]['temps']}:t> (<t:{event[1]['temps']}:R>)")
+                            message_en = await self.get_channel(self.channel_e4k_en).send(f"{noms[1]}, ends at <t:{event[1]['temps']}:t> (<t:{event[1]['temps']}:R>)")
+                        
+                        try:
+                            await message_fr.publish()
+                        except Exception as e:
+                            logging.error(f""""Failed to publish message: {e}""")
+                        try:
+                            await message_en.publish()
+                        except Exception as e:
+                            logging.error(f""""Failed to publish message: {e}""")
 
                         self.base.patch(f"{folder}/{event[0]}", {"nouveau": 0})
 
