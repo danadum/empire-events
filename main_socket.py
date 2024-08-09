@@ -58,7 +58,7 @@ class MainSocket(websocket.WebSocketApp):
                         self.base.patch(f"/events/{event['EID']}", {"temps": temps, "contenu": contenu, "reduction": reduction, "nouveau": 1})
                 elif event["EID"] == 106 and self.temp_serveur != ["RE", event["TSID"]]:
                     if event["IPS"] == 0:
-                        if event["TSID"] == 16:
+                        if event["TSID"] in [16, 18]:
                             self.send("""%xt%EmpireEx_3%sbp%1%{"PID":2358,"BT":0,"TID":106,"AMT":1,"KID":0,"AID":-1,"PC2":-1,"BA":0,"PWR":0,"_PO":-1}%""")
                             self.send("""%xt%EmpireEx_3%tsc%1%{"ID":40,"OC2":0,"PWR":0,"GST":2}%""")
                         else:
