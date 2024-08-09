@@ -18,12 +18,16 @@ MDP_E4K = os.getenv("PASSWORD_E4K")
 if __name__ == "__main__":
     base = firebase.FirebaseApplication("https://gge-bot-default-rtdb.europe-west1.firebasedatabase.app", None)
 
+    time.sleep(2)
+
     socket = MainSocket("wss://ep-live-fr1-game.goodgamestudios.com/", base, NOM, MDP)
     Thread(target=socket.run_forever, kwargs={'reconnect': 600}).start()
 
-    time.sleep(5)
+    time.sleep(2)
     
     socket_e4k = MainSocketE4K("ws://e4k-live-int4-game.goodgamestudios.com/", base, NOM_E4K, MDP_E4K)
     Thread(target=socket_e4k.run_forever, kwargs={'reconnect': 600}).start()
+
+    time.sleep(2)
 
     Bot("%", base).run(os.getenv("TOKEN"))

@@ -6,7 +6,7 @@ from threading import Thread
 import time
 import websocket
 from secondary_socket import SecondarySocket
-
+import traceback
 
 class MainSocket(websocket.WebSocketApp):
     def __init__(self, url, base, nom, mdp):
@@ -24,7 +24,7 @@ class MainSocket(websocket.WebSocketApp):
         self.temp_socket = None
 
     def on_open(self, ws):
-        logging.error(f"### [{datetime.now()}] Main socket connected ###")
+        logging.error(f"### [{datetime.now()}] Main socket GGE connected ###")
         time.sleep(1)
         self.send("""<msg t='sys'><body action='verChk' r='0'><ver v='166' /></body></msg>""")
         self.send("""<msg t='sys'><body action='autoJoin' r='-1'></body></msg>""")
@@ -133,7 +133,7 @@ class MainSocket(websocket.WebSocketApp):
                 vagues = f"""[{",".join(1 * [vague])}]"""
                 cour = f"""[[{type_soldats},{100 + level}]]"""
                 attaque = f"""%xt%EmpireEx_3%cra%1%{{"SX":{self.details_cp[1]},"SY":{self.details_cp[2]},"TX":{data["gaa"]["AI"][1]},"TY":{data["gaa"]["AI"][2]},"KID":0,"LID":{commandant["ID"]},"WT":0,"HBW":1007,"BPC":0,"ATT":0,"AV":0,"LP":0,"FC":0,"PTT":0,"SD":0,"ICA":0,"CD":99,"A":{vagues},"BKS":[],"AST":[],"RW":{cour}}}%"""
-                logging.error(attaque)
+                logging.error(f"""GGE attacking NPC at position {data["gaa"]["AI"][1]}:{data["gaa"]["AI"][2]}""")
                 self.send(attaque)
 
     def launch_attacks(self, data):
@@ -146,12 +146,12 @@ class MainSocket(websocket.WebSocketApp):
                     time.sleep(5)
 
     def on_error(self, ws, error):
-        logging.error("### error in main socket ###")
-        logging.error(error)
+        logging.error("### error in main socket GGE ###")
+        logging.error(traceback.format_exc())
         self.close()
 
     def on_close(self, ws, close_status_code, close_msg):
-        logging.error(f"### [{datetime.now()}] Main socket closed ###")
+        logging.error(f"### [{datetime.now()}] Main socket closed GGE ###")
 
     def close(self):
         if self.sock is not None:

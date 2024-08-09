@@ -25,7 +25,7 @@ class MainSocketE4K(websocket.WebSocketApp):
         self.temp_socket = None
 
     def on_open(self, ws):
-        logging.error(f"### [{datetime.now()}] Main socket connected ###")
+        logging.error(f"### [{datetime.now()}] Main socket E4K connected ###")
         time.sleep(1)
         self.send("""<msg t='sys'><body action='verChk' r='0'><ver v='166' /></body></msg>""")
         self.send("""<msg t='sys'><body action='autoJoin' r='-1'></body></msg>""")
@@ -43,7 +43,6 @@ class MainSocketE4K(websocket.WebSocketApp):
 
     def on_message(self, ws, message):
         message = message.decode('UTF-8')
-        print(message, message[15:20])
         if message[:20] == "%xt%core_lga%1%10005%":
             Thread(target=self.run).start()
         elif message[:10] == "%xt%core_lga%1%" and message[15:20] != "10005":
@@ -138,7 +137,7 @@ class MainSocketE4K(websocket.WebSocketApp):
                 vagues = f"""[{",".join(1 * [vague])}]"""
                 cour = f"""[[{type_soldats},{100 + level}]]"""
                 attaque = f"""%xt%EmpirefourkingdomsExGG_34%cra%1%{{"SX":{self.details_cp[1]},"SY":{self.details_cp[2]},"TX":{data["gaa"]["AI"][1]},"TY":{data["gaa"]["AI"][2]},"KID":0,"LID":{commandant["ID"]},"WT":0,"HBW":1007,"BPC":0,"ATT":0,"AV":0,"LP":0,"FC":0,"PTT":0,"SD":0,"ICA":0,"CD":99,"A":{vagues},"BKS":[],"AST":[],"RW":{cour}}}%"""
-                logging.error(attaque)
+                logging.error(f"""E4K attacking NPC at position {data["gaa"]["AI"][1]}:{data["gaa"]["AI"][2]}""")
                 self.send(attaque)
 
     def launch_attacks(self, data):
@@ -151,13 +150,12 @@ class MainSocketE4K(websocket.WebSocketApp):
                     time.sleep(5)
 
     def on_error(self, ws, error):
-        logging.error("### error in main socket ###")
-        print(traceback.format_exc())
-        logging.error(error)
+        logging.error("### error in main socket E4K ###")
+        logging.error(traceback.format_exc())
         self.close()
 
     def on_close(self, ws, close_status_code, close_msg):
-        logging.error(f"### [{datetime.now()}] Main socket closed ###")
+        logging.error(f"### [{datetime.now()}] Main socket E4K closed ###")
 
     def close(self):
         if self.sock is not None:

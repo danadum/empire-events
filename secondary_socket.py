@@ -4,6 +4,7 @@ from threading import Thread
 import time
 import websocket
 import json
+import traceback
 
 
 class SecondarySocket(websocket.WebSocketApp):
@@ -44,7 +45,7 @@ class SecondarySocket(websocket.WebSocketApp):
 
     def on_error(self, ws, error):
         logging.error("### error in secondary socket ###")
-        logging.error(error)
+        logging.error(traceback.format_exc())
         self.close()
 
     def on_close(self, ws, close_status_code, close_msg):
