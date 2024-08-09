@@ -148,7 +148,7 @@ async def getJsonFile(url):
 
 def getItemVersionSync():
     with requests.get("https://empire-html5.goodgamestudios.com/default/items/ItemsVersion.properties") as response:
-        return response.text().split("=")[1]
+        return response.text.split("=")[1]
 
 def getJsonFileSync(url):
     with requests.get(url) as response:
