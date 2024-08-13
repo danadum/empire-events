@@ -31,7 +31,7 @@ class Bot(commands.Bot):
             logging.error(f"### [{datetime.now()}] Bot running ###")
             self.mainLoop.start()
     
-    def set_base(base):
+    def set_base(self, base):
         self.base = base
 
     @tasks.loop(seconds=300)
