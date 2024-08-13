@@ -8,14 +8,6 @@ import ijson
 
 class Bot(commands.Bot):
     def __init__(self, prefix, base):
-        super().__init__(prefix, intents=discord.Intents.all())
-        self.base = base
-        self.channel_fr = 774929943540006952
-        self.channel_en = 956915826894708766
-        self.channel_e4k_fr = 956916103869792266
-        self.channel_e4k_en = 956915929982328892
-        self.channel_log = 1076865424295219251
-        self.server_fr = 481447341849706496
         logging.error("Init bot")
         with requests.get("https://empire-html5.goodgamestudios.com/default/items/ItemsVersion.properties") as response:
             donnees_version = response.text.split("=")[1]
@@ -25,6 +17,14 @@ class Bot(commands.Bot):
         logging.error("Get data")
         self.donnees = parse_donnees(donnees, ["buildings", "shoppingCarts", "rewards"])
         logging.error("Parse data")
+        super().__init__(prefix, intents=discord.Intents.all())
+        self.base = base
+        self.channel_fr = 774929943540006952
+        self.channel_en = 956915826894708766
+        self.channel_e4k_fr = 956916103869792266
+        self.channel_e4k_en = 956915929982328892
+        self.channel_log = 1076865424295219251
+        self.server_fr = 481447341849706496
 
         @self.event
         async def on_ready():
