@@ -139,54 +139,54 @@ def parse_donnees(donnees_str, categories):
     donnees = None
     parser = ijson.parse(donnees_str)
     for prefix, event, value in parser:
-    if not prefix or any(prefix.startswith(category) for category in categories):
-        keys = prefix.split('.')
-        keys = [-1 if key == 'item' else key for key in keys]
-        
-        if event == 'start_array':
-            if not prefix:
-                donnees = []
-            else:
-                current_data = donnees
-                for key in keys[:-1]:
-                    current_data = current_data[key]
-                if keys[-1] == -1:
-                    current_data.append([])
+        if not prefix or any(prefix.startswith(category) for category in categories):
+            keys = prefix.split('.')
+            keys = [-1 if key == 'item' else key for key in keys]
+            
+            if event == 'start_array':
+                if not prefix:
+                    donnees = []
                 else:
-                    current_data[keys[-1]] = [] 
-        elif event == 'end_array':
-            pass
-        elif event == 'start_map':
-            if not prefix:
-                donnees = {}
-            else:
-                current_data = donnees
-                for key in keys[:-1]:
-                    current_data = current_data[key]
-                if keys[-1] == -1:
-                    current_data.append({})
+                    current_data = donnees
+                    for key in keys[:-1]:
+                        current_data = current_data[key]
+                    if keys[-1] == -1:
+                        current_data.append([])
+                    else:
+                        current_data[keys[-1]] = [] 
+            elif event == 'end_array':
+                pass
+            elif event == 'start_map':
+                if not prefix:
+                    donnees = {}
                 else:
-                    current_data[keys[-1]] = {}
-        elif event == 'end_map':
-            pass
-        elif event == 'map_key':
-            if not prefix:
-                if any(value.startswith(category) for category in categories):
-                    donnees[value] = None
+                    current_data = donnees
+                    for key in keys[:-1]:
+                        current_data = current_data[key]
+                    if keys[-1] == -1:
+                        current_data.append({})
+                    else:
+                        current_data[keys[-1]] = {}
+            elif event == 'end_map':
+                pass
+            elif event == 'map_key':
+                if not prefix:
+                    if any(value.startswith(category) for category in categories):
+                        donnees[value] = None
+                else:
+                    current_data = donnees
+                    for key in keys:
+                        current_data = current_data[key]
+                    current_data[value] = None
+            elif event in ['string', 'number', 'boolean', 'null']:
+                if not prefix:
+                    donnees = value
+                else:
+                    current_data = donnees
+                    for key in keys[:-1]:
+                        current_data = current_data[key]
+                    current_data[keys[-1]] = value
             else:
-                current_data = donnees
-                for key in keys:
-                    current_data = current_data[key]
-                current_data[value] = None
-        elif event in ['string', 'number', 'boolean', 'null']:
-            if not prefix:
-                donnees = value
-            else:
-                current_data = donnees
-                for key in keys[:-1]:
-                    current_data = current_data[key]
-                current_data[keys[-1]] = value
-        else:
-            print('Unknown event:', event)
+                print('Unknown event:', event)
 
     return donnees
