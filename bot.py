@@ -3,9 +3,8 @@ from datetime import datetime
 import time
 import discord
 from discord.ext import commands, tasks
-# import aiohttp
 import requests
-
+import ijson
 
 class Bot(commands.Bot):
     def __init__(self, prefix, base):
@@ -17,15 +16,15 @@ class Bot(commands.Bot):
         self.channel_e4k_en = 956915929982328892
         self.channel_log = 1076865424295219251
         self.server_fr = 481447341849706496
-        # self.donnees = {}
-        donnees_version = getItemVersionSync()
-        self.donnees = getJsonFileSync(f"https://empire-html5.goodgamestudios.com/default/items/items_v{donnees_version}.json")
+        with requests.get("https://empire-html5.goodgamestudios.com/default/items/ItemsVersion.properties") as response:
+            donnees_version = response.text.split("=")[1]
+        with requests.get(f"https://empire-html5.goodgamestudios.com/default/items/items_v{donnees_version}.json")) as response:
+            donnees = response.text
+        self.donnees = parse_donnees(donnees, ["buildings", "shoppingCarts", "rewards"])
 
         @self.event
         async def on_ready():
             logging.error(f"### [{datetime.now()}] Bot running ###")
-            # donnees_version = await getItemVersion()
-            # self.donnees = await getJsonFile(f"https://empire-html5.goodgamestudios.com/default/items/items_v{donnees_version}.json")
             self.mainLoop.start()
 
 
@@ -136,20 +135,58 @@ class Bot(commands.Bot):
             return f"<@&841978439329644606> Promo de {event[1]['contenu']}%", f"<@&841978439329644606> Prime time of {event[1]['contenu']}%"
 
 
-async def getItemVersion():
-    async with aiohttp.ClientSession() as session:
-        async with session.get("https://empire-html5.goodgamestudios.com/default/items/ItemsVersion.properties") as response:
-            return (await response.text()).split("=")[1]
+def parse_donnees(donnees_str, categories):
+    donnees = None
+    parser = ijson.parse(donnees_str)
+    for prefix, event, value in parser:
+    if not prefix or any(prefix.startswith(category) for category in categories):
+        keys = prefix.split('.')
+        keys = [-1 if key == 'item' else key for key in keys]
+        
+        if event == 'start_array':
+            if not prefix:
+                donnees = []
+            else:
+                current_data = donnees
+                for key in keys[:-1]:
+                    current_data = current_data[key]
+                if keys[-1] == -1:
+                    current_data.append([])
+                else:
+                    current_data[keys[-1]] = [] 
+        elif event == 'end_array':
+            pass
+        elif event == 'start_map':
+            if not prefix:
+                donnees = {}
+            else:
+                current_data = donnees
+                for key in keys[:-1]:
+                    current_data = current_data[key]
+                if keys[-1] == -1:
+                    current_data.append({})
+                else:
+                    current_data[keys[-1]] = {}
+        elif event == 'end_map':
+            pass
+        elif event == 'map_key':
+            if not prefix:
+                if any(value.startswith(category) for category in categories):
+                    donnees[value] = None
+            else:
+                current_data = donnees
+                for key in keys:
+                    current_data = current_data[key]
+                current_data[value] = None
+        elif event in ['string', 'number', 'boolean', 'null']:
+            if not prefix:
+                donnees = value
+            else:
+                current_data = donnees
+                for key in keys[:-1]:
+                    current_data = current_data[key]
+                current_data[keys[-1]] = value
+        else:
+            print('Unknown event:', event)
 
-async def getJsonFile(url):
-    async with aiohttp.ClientSession() as session:
-        async with session.get(url) as response:
-            return await response.json()
-
-def getItemVersionSync():
-    with requests.get("https://empire-html5.goodgamestudios.com/default/items/ItemsVersion.properties") as response:
-        return response.text.split("=")[1]
-
-def getJsonFileSync(url):
-    with requests.get(url) as response:
-        return response.json()
+    return donnees
