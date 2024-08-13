@@ -16,11 +16,15 @@ class Bot(commands.Bot):
         self.channel_e4k_en = 956915929982328892
         self.channel_log = 1076865424295219251
         self.server_fr = 481447341849706496
+        logging.error("Init bot")
         with requests.get("https://empire-html5.goodgamestudios.com/default/items/ItemsVersion.properties") as response:
             donnees_version = response.text.split("=")[1]
+        logging.error("Get version")
         with requests.get(f"https://empire-html5.goodgamestudios.com/default/items/items_v{donnees_version}.json") as response:
             donnees = response.text
+        logging.error("Get data")
         self.donnees = parse_donnees(donnees, ["buildings", "shoppingCarts", "rewards"])
+        logging.error("Parse data")
 
         @self.event
         async def on_ready():
