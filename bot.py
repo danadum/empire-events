@@ -18,7 +18,7 @@ class Bot(commands.Bot):
         self.server_fr = 481447341849706496
         with requests.get("https://empire-html5.goodgamestudios.com/default/items/ItemsVersion.properties") as response:
             donnees_version = response.text.split("=")[1]
-        with requests.get(f"https://empire-html5.goodgamestudios.com/default/items/items_v{donnees_version}.json")) as response:
+        with requests.get(f"https://empire-html5.goodgamestudios.com/default/items/items_v{donnees_version}.json") as response:
             donnees = response.text
         self.donnees = parse_donnees(donnees, ["buildings", "shoppingCarts", "rewards"])
 
