@@ -30,7 +30,9 @@ class Bot(commands.Bot):
         async def on_ready():
             logging.error(f"### [{datetime.now()}] Bot running ###")
             self.mainLoop.start()
-
+    
+    def set_base(base):
+        self.base = base
 
     @tasks.loop(seconds=300)
     async def mainLoop(self):

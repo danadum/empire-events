@@ -16,11 +16,12 @@ NOM_E4K = os.getenv("NOM_E4K")
 MDP_E4K = os.getenv("PASSWORD_E4K")
 
 if __name__ == "__main__":
-    base = firebase.FirebaseApplication("https://gge-bot-default-rtdb.europe-west1.firebasedatabase.app", None)
+    bot = Bot("%", None)
 
     time.sleep(2)
 
-    bot = Bot("%", base)
+    base = firebase.FirebaseApplication("https://gge-bot-default-rtdb.europe-west1.firebasedatabase.app", None)
+    bot.set_base(base)
 
     time.sleep(2)
 
