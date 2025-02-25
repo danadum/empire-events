@@ -35,92 +35,101 @@ class MainSocket(GgeSocket):
 
     def offerings_thread(self):
         while self.sock is not None:
-            offerings_response = self.get_offerings_status()
-            if offerings_response["payload"]["status"] == 0:
-                if offerings_response["payload"]["data"]["CHR"][0]["FOA"] > 0:
-                    self.make_offering(1, 6001)
-                elif offerings_response["payload"]["data"]["CHR"][1]["FOA"] > 0:
-                    self.make_offering(2, 6002)
-                elif offerings_response["payload"]["data"]["CHR"][2]["FOA"] > 0:
-                    self.make_offering(3, 6003)
+            try:
+                offerings_response = self.get_offerings_status()
+                if offerings_response["payload"]["status"] == 0:
+                    if offerings_response["payload"]["data"]["CHR"][0]["FOA"] > 0:
+                        self.make_offering(1, 6001)
+                    elif offerings_response["payload"]["data"]["CHR"][1]["FOA"] > 0:
+                        self.make_offering(2, 6002)
+                    elif offerings_response["payload"]["data"]["CHR"][2]["FOA"] > 0:
+                        self.make_offering(3, 6003)
+            except Exception as e:
+                logging.error(f"Error in offerings thread {self.game}: {e}")
             time.sleep(3600)
 
     def attacks_thread(self):
         while self.sock is not None:
-            castles_response = self.get_castles()
-            great_empire = next(filter(lambda kingdom: kingdom["KID"] == 0, castles_response["payload"]["data"]["C"]))
-            main_castle = next(filter(lambda castle: castle["AI"][0] == 1, great_empire["AI"]))["AI"]
-            map_response = self.get_map_chunk(0, main_castle[1] // 13 * 13, main_castle[2] // 13 * 13)
-            for map_object in map_response["payload"]["data"]["AI"]:
-                if len(map_object) == 7 and map_object[0] == 2 and map_object[5] < 0:
-                    movements_response = self.get_movements()
-                    movements = [movement for movement in movements_response["payload"]["data"]["M"] if movement["M"]["OID"] == main_castle[4] and movement.get("UM") is not None]
-                    used_lords = [movement["UM"]["L"].get("ID") for movement in movements]
-                    current_attacks = [movement["M"]["TA"] for movement in movements if len(movement["M"]["TA"]) == 7 and movement["M"]["TA"][0] == 2]
-                    if next(filter(lambda attack_target: attack_target[1] == map_object[1] and attack_target[2] == map_object[2], current_attacks), None) is None:
-                        target_response = self.get_target_infos(0, main_castle[1], main_castle[2], map_object[1], map_object[2])
-                        lord = next(filter(lambda com: com["ID"] not in used_lords, target_response["payload"]["data"]["gli"]["C"]), None)
-                        unit_type = None
-                        if next(filter(lambda obj: obj[0] == 9, target_response["payload"]["data"]["gui"]["I"]), [0, 0])[1] > 320:
-                            unit_type = 9
-                        elif next(filter(lambda obj: obj[0] == 10, target_response["payload"]["data"]["gui"]["I"]), [0, 0])[1] > 320:
-                            unit_type = 10
-                        if lord is not None and unit_type is not None:
-                            level = math.floor(1.9 * map_object[4] ** 0.555) + 1
-                            max_units = min(260, 5 * level + 8) if level <= 69 else 320
-                            flank_limit = math.ceil(0.2 * max_units)
-                            front_limit = max_units - 2 * flank_limit
-                            waves = [{"L": {"T": [], "U": [unit_type, flank_limit]}, "R": {"T": [], "U": [unit_type, flank_limit]}, "M": {"T": [], "U": []}}]
-                            final_wave = [[unit_type, 100 + level]]
-                            self.send_attack(0, main_castle[1], main_castle[2], map_object[1], map_object[2], waves, lord["ID"], horses_type=1007, final_wave=final_wave)
-                            logging.error(f"""GGE attacking NPC at position {map_object[1]}:{map_object[2]}""")
-                            time.sleep(5)
+            try:
+                castles_response = self.get_castles()
+                great_empire = next(filter(lambda kingdom: kingdom["KID"] == 0, castles_response["payload"]["data"]["C"]))
+                main_castle = next(filter(lambda castle: castle["AI"][0] == 1, great_empire["AI"]))["AI"]
+                map_response = self.get_map_chunk(0, main_castle[1] // 13 * 13, main_castle[2] // 13 * 13)
+                for map_object in map_response["payload"]["data"]["AI"]:
+                    if len(map_object) == 7 and map_object[0] == 2 and map_object[5] < 0:
+                        movements_response = self.get_movements()
+                        movements = [movement for movement in movements_response["payload"]["data"]["M"] if movement["M"]["OID"] == main_castle[4] and movement.get("UM") is not None]
+                        used_lords = [movement["UM"]["L"].get("ID") for movement in movements]
+                        current_attacks = [movement["M"]["TA"] for movement in movements if len(movement["M"]["TA"]) == 7 and movement["M"]["TA"][0] == 2]
+                        if next(filter(lambda attack_target: attack_target[1] == map_object[1] and attack_target[2] == map_object[2], current_attacks), None) is None:
+                            target_response = self.get_target_infos(0, main_castle[1], main_castle[2], map_object[1], map_object[2])
+                            lord = next(filter(lambda com: com["ID"] not in used_lords, target_response["payload"]["data"]["gli"]["C"]), None)
+                            unit_type = None
+                            if next(filter(lambda obj: obj[0] == 9, target_response["payload"]["data"]["gui"]["I"]), [0, 0])[1] > 320:
+                                unit_type = 9
+                            elif next(filter(lambda obj: obj[0] == 10, target_response["payload"]["data"]["gui"]["I"]), [0, 0])[1] > 320:
+                                unit_type = 10
+                            if lord is not None and unit_type is not None:
+                                level = math.floor(1.9 * map_object[4] ** 0.555) + 1
+                                max_units = min(260, 5 * level + 8) if level <= 69 else 320
+                                flank_limit = math.ceil(0.2 * max_units)
+                                front_limit = max_units - 2 * flank_limit
+                                waves = [{"L": {"T": [], "U": [unit_type, flank_limit]}, "R": {"T": [], "U": [unit_type, flank_limit]}, "M": {"T": [], "U": []}}]
+                                final_wave = [[unit_type, 100 + level]]
+                                self.send_attack(0, main_castle[1], main_castle[2], map_object[1], map_object[2], waves, lord["ID"], horses_type=1007, final_wave=final_wave)
+                                logging.error(f"""GGE attacking NPC at position {map_object[1]}:{map_object[2]}""")
+                                time.sleep(5)
+            except Exception as e:
+                logging.error(f"Error in attacks thread {self.game}: {e}")
             time.sleep(600)
 
     def events_thread(self):
         while self.sock is not None:
-            events_response = self.get_events()
-            for event in events_response["payload"]["data"]["E"]:
-                if event["RS"] > 30 and event["EID"] in [7, 75, 90]:
-                    end_time = int(event['RS']) + int(time.time())
-                    content = str(event.get("WID") or event.get("BID") or event.get("TID"))
-                    discount = event.get('DIS', 0)
-                    self.cursor.execute(f"SELECT * FROM {self.game.lower()}_events WHERE id = {event['EID']}")
-                    old_event = self.cursor.fetchone()
-                    if old_event is None:
-                        self.cursor.execute(f"INSERT INTO {self.game.lower()}_events (id, end_time, content, discount, new) VALUES ({event['EID']}, {end_time}, '{content}', {discount}, 1)")
-                        self.connection.commit()
-                    elif old_event[1] < int(time.time()) or old_event[2] != content or old_event[3] != discount:
-                        self.cursor.execute(f"UPDATE {self.game.lower()}_events SET end_time = {end_time}, content = '{content}', discount = {discount}, new = 1 WHERE id = {event['EID']}")
-                        self.connection.commit()
-                elif event["EID"] == 106 and (self.temp_socket is None or self.temp_socket.sock is None):
-                    if event["IPS"] == 0:
-                        if event["TSID"] in [16, 18]:
-                            self.buy_package_generic(0, 0, 106, 2358, 1)
-                            self.choose_outer_realm_castle(40)
+            try:
+                events_response = self.get_events()
+                for event in events_response["payload"]["data"]["E"]:
+                    if event["RS"] > 30 and event["EID"] in [7, 75, 90]:
+                        end_time = int(event['RS']) + int(time.time())
+                        content = str(event.get("WID") or event.get("BID") or event.get("TID"))
+                        discount = event.get('DIS', 0)
+                        self.cursor.execute(f"SELECT * FROM {self.game.lower()}_events WHERE id = {event['EID']}")
+                        old_event = self.cursor.fetchone()
+                        if old_event is None:
+                            self.cursor.execute(f"INSERT INTO {self.game.lower()}_events (id, end_time, content, discount, new) VALUES ({event['EID']}, {end_time}, '{content}', {discount}, 1)")
+                            self.connection.commit()
+                        elif old_event[1] < int(time.time()) or old_event[2] != content or old_event[3] != discount:
+                            self.cursor.execute(f"UPDATE {self.game.lower()}_events SET end_time = {end_time}, content = '{content}', discount = {discount}, new = 1 WHERE id = {event['EID']}")
+                            self.connection.commit()
+                    elif event["EID"] == 106 and (self.temp_socket is None or self.temp_socket.sock is None):
+                        if event["IPS"] == 0:
+                            if event["TSID"] in [16, 18]:
+                                self.buy_package_generic(0, 0, 106, 2358, 1)
+                                self.choose_outer_realm_castle(40)
+                            else:
+                                self.choose_outer_realm_castle(31, only_rubies=1)
+                        token_response = self.get_outer_realm_token()
+                        if token_response["payload"]["data"]['TSIP'].startswith('e4k'):
+                            temp_socket_url = f"ws://{token_response['payload']['data']['TSIP']}"
                         else:
-                            self.choose_outer_realm_castle(31, only_rubies=1)
-                    token_response = self.get_outer_realm_token()
-                    if token_response["payload"]["data"]['TSIP'].startswith('e4k'):
-                        temp_socket_url = f"ws://{token_response['payload']['data']['TSIP']}"
-                    else:
-                        temp_socket_url = f"wss://{token_response['payload']['data']['TSIP']}"
-                    self.temp_socket = SecondarySocket(self.connection, self.cursor, self.game, temp_socket_url, token_response["payload"]["data"]["TSZ"], token_response["payload"]["data"]["TLT"], "OR")
-                    Thread(target=self.temp_socket.run_forever, kwargs={'reconnect': False}).start()
-                elif event["EID"] == 113 and (self.temp_socket is None or self.temp_socket.sock is None):
-                    if event["IPS"] == 0:
-                        self.choose_bth_castle(34, only_rubies=1)
-                    token_response = self.get_bth_token()
-                    if token_response["payload"]["data"]['TSIP'].startswith('e4k'):
-                        temp_socket_url = f"ws://{token_response['payload']['data']['TSIP']}"
-                    else:
-                        temp_socket_url = f"wss://{token_response['payload']['data']['TSIP']}"
-                    self.temp_socket = SecondarySocket(self.connection, self.cursor, self.game, temp_socket_url, token_response["payload"]["data"]["TSZ"], token_response["payload"]["data"]["TLT"], "BTH")
-                    Thread(target=self.temp_socket.run_forever, kwargs={'reconnect': False}).start()
-                elif event["EID"] == 117 and event.get("FTDC") == 1:
-                    self.make_divination()
-                elif event["EID"] == 15 and event.get("OP") is not None and event.get("OP")[0] < 3:
-                    self.spin_classic_lucky_wheel()
+                            temp_socket_url = f"wss://{token_response['payload']['data']['TSIP']}"
+                        self.temp_socket = SecondarySocket(self.connection, self.cursor, self.game, temp_socket_url, token_response["payload"]["data"]["TSZ"], token_response["payload"]["data"]["TLT"], "OR")
+                        Thread(target=self.temp_socket.run_forever, kwargs={'reconnect': False}).start()
+                    elif event["EID"] == 113 and (self.temp_socket is None or self.temp_socket.sock is None):
+                        if event["IPS"] == 0:
+                            self.choose_bth_castle(34, only_rubies=1)
+                        token_response = self.get_bth_token()
+                        if token_response["payload"]["data"]['TSIP'].startswith('e4k'):
+                            temp_socket_url = f"ws://{token_response['payload']['data']['TSIP']}"
+                        else:
+                            temp_socket_url = f"wss://{token_response['payload']['data']['TSIP']}"
+                        self.temp_socket = SecondarySocket(self.connection, self.cursor, self.game, temp_socket_url, token_response["payload"]["data"]["TSZ"], token_response["payload"]["data"]["TLT"], "BTH")
+                        Thread(target=self.temp_socket.run_forever, kwargs={'reconnect': False}).start()
+                    elif event["EID"] == 117 and event.get("FTDC") == 1:
+                        self.make_divination()
+                    elif event["EID"] == 15 and event.get("OP") is not None and event.get("OP")[0] < 3:
+                        self.spin_classic_lucky_wheel()
+            except Exception as e:
+                logging.error(f"Error in events thread {self.game}: {e}")
             time.sleep(60)
 
     def on_message(self, ws, message):

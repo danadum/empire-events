@@ -19,10 +19,6 @@ class Bot(commands.Bot):
         self.channel_gge_en = 956915826894708766
         self.channel_e4k_fr = 956916103869792266
         self.channel_e4k_en = 956915929982328892
-        self.channel_gge_fr = 1343669487731216516
-        self.channel_gge_en = 1343669487731216516
-        self.channel_e4k_fr = 1343669487731216516
-        self.channel_e4k_en = 1343669487731216516
 
         @self.event
         async def on_ready():
