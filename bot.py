@@ -11,12 +11,7 @@ class Bot(commands.Bot):
             items_version = response.text.split("=")[1]
         with requests.get(f"https://empire-html5.goodgamestudios.com/default/items/items_v{items_version}.json", stream=True) as response:
             response.raw.decode_content = True
-            needed = {"buildings", "shoppingCarts", "rewards"}
-            self.items = {
-                key: value
-                for key, value in ijson.kvitems(response.raw, '')
-                if key in needed
-            }
+            self.items = { key: value for key, value in ijson.kvitems(response.raw, '') if key in ["buildings", "shoppingCarts", "rewards"] }
         super().__init__(prefix, intents=discord.Intents.all())
         self.connection = connection
         self.cursor = cursor

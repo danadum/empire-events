@@ -144,3 +144,8 @@ class MainSocket(GgeSocket):
 
     def on_close(self, ws, close_status_code, close_msg):
         logging.error(f"### Main socket {self.game} closed ###")
+
+    def close(self, **kwargs):
+        if self.sock:
+            self.sock.close(**kwargs)
+            self.sock = None
