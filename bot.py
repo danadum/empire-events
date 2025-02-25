@@ -9,9 +9,14 @@ class Bot(commands.Bot):
     def __init__(self, prefix, connection, cursor):
         with requests.get("https://empire-html5.goodgamestudios.com/default/items/ItemsVersion.properties") as response:
             items_version = response.text.split("=")[1]
-        with requests.get(f"https://empire-html5.goodgamestudios.com/default/items/items_v{items_version}.json") as response:
-            items = response.text
-        self.items = parse_items(items, ["buildings", "shoppingCarts", "rewards"])
+        with requests.get(f"https://empire-html5.goodgamestudios.com/default/items/items_v{items_version}.json", stream=True) as response:
+            response.raw.decode_content = True
+            needed = {"buildings", "shoppingCarts", "rewards"}
+            self.items = {
+                key: value
+                for key, value in ijson.kvitems(response.raw, '')
+                if key in needed
+            }
         super().__init__(prefix, intents=discord.Intents.all())
         self.connection = connection
         self.cursor = cursor
@@ -141,38 +146,3 @@ class Bot(commands.Bot):
             return f"<@&841978302562172969> Promo de {event[2]}%", f"<@&841978302562172969> Prime time of {event[2]}%"
         elif event[0] == 997 and int(event[2]) >= 200:  # 200% Lacis
             return f"<@&841978439329644606> Promo de {event[2]}%", f"<@&841978439329644606> Prime time of {event[2]}%"
-
-
-def parse_items(items_str, categories):
-    items = None
-    parser = ijson.parse(items_str)
-    for prefix, event, value in parser:
-        if not prefix or any(prefix.startswith(category) for category in categories):        
-            if event == 'start_array':
-                val = []
-            elif event == 'start_map':
-                val = {}
-            elif event in ['string', 'number', 'boolean', 'null']:
-                val = value
-            elif event in ['end_array', 'end_map', 'map_key']:
-                continue
-            else:
-                print('Unknown event:', event)
-                continue
-
-            if not prefix:
-                items = val
-            else:
-                current_data = items
-                keys = [-1 if key == 'item' else key for key in prefix.split('.')]
-                for key in keys[:-1]:
-                    current_data = current_data[key]
-                if keys[-1] == -1:
-                    current_data.append(val)
-                else:
-                    current_data[keys[-1]] = val
-                current_data = None
-                val = None
-                keys = None
-
-    return items
