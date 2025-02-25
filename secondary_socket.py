@@ -7,10 +7,9 @@ from pygge.gge_socket import GgeSocket
 
 
 class SecondarySocket(GgeSocket):
-    def __init__(self, connection, cursor, game, url, server_header, token, server_type):
+    def __init__(self, pool, game, url, server_header, token, server_type):
         super().__init__(url, server_header, on_open=self.on_open, on_message=self.on_message, on_error=self.on_error, on_close=self.on_close)
-        self.connection = connection
-        self.cursor = cursor
+        self.pool = pool
         self.game = game
         self.token = token
         self.server_type = server_type
@@ -33,14 +32,17 @@ class SecondarySocket(GgeSocket):
             if message["payload"]["data"]["remainingTime"] > 30 and int(message["payload"]["data"]["type"]) == 1:
                 end_time = message["payload"]["data"]["remainingTime"] + int(time.time())
                 event_id = 998 if self.server_type == "OR" else 997
-                self.cursor.execute(f"SELECT * FROM {self.game.lower()}_events WHERE id = {event_id}")
-                old_event = self.connection.fetchone()
+                connection = self.pool.getconn()
+                cursor = connection.cursor()
+                cursor.execute(f"SELECT * FROM {self.game.lower()}_events WHERE id = {event_id}")
+                old_event = cursor.fetchone()
                 if old_event is None:
-                    self.cursor.execute(f"INSERT INTO {self.game.lower()}_events (id, end_time, content, discount, new) VALUES ({event_id}, {end_time}, '{message['payload']['data']['bonusPremium']}', 0, 1)")
-                    self.connection.commit()
+                    cursor.execute(f"INSERT INTO {self.game.lower()}_events (id, end_time, content, discount, new) VALUES ({event_id}, {end_time}, '{message['payload']['data']['bonusPremium']}', 0, 1)")
+                    connection.commit()
                 elif old_event[1] < int(time.time()) or old_event[2] != message["payload"]["data"]["bonusPremium"]:
-                    self.cursor.execute(f"UPDATE {self.game.lower()}_events SET end_time = {end_time}, content = '{message['payload']['data']['bonusPremium']}', discount = 0, new = 1 WHERE id = {event_id}")
-                    self.connection.commit()
+                    cursor.execute(f"UPDATE {self.game.lower()}_events SET end_time = {end_time}, content = '{message['payload']['data']['bonusPremium']}', discount = 0, new = 1 WHERE id = {event_id}")
+                    connection.commit()
+                self.pool.putconn(connection)
 
     def on_error(self, ws, error):
         logging.error(f"### error in secondary socket {self.game} ###")

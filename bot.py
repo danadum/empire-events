@@ -6,15 +6,14 @@ import requests
 import ijson
 
 class Bot(commands.Bot):
-    def __init__(self, prefix, connection, cursor):
+    def __init__(self, prefix, pool):
         with requests.get("https://empire-html5.goodgamestudios.com/default/items/ItemsVersion.properties") as response:
             items_version = response.text.split("=")[1]
         with requests.get(f"https://empire-html5.goodgamestudios.com/default/items/items_v{items_version}.json", stream=True) as response:
             response.raw.decode_content = True
             self.items = { key: value for key, value in ijson.kvitems(response.raw, '') if key in ["buildings", "shoppingCarts", "rewards"] }
         super().__init__(prefix, intents=discord.Intents.all())
-        self.connection = connection
-        self.cursor = cursor
+        self.pool = pool
         self.channel_gge_fr = 774929943540006952
         self.channel_gge_en = 956915826894708766
         self.channel_e4k_fr = 956916103869792266
@@ -23,24 +22,24 @@ class Bot(commands.Bot):
         @self.event
         async def on_ready():
             logging.error(f"### Bot running ###")
-            self.mainLoop.start()
+            self.main_loop.start()
     
-    def set_connection(self, connection):
-        self.connection = connection
-
-    def set_cursor(self, cursor):
-        self.cursor = cursor
+    def set_pool(self, pool):
+        self.pool = pool
 
     @tasks.loop(seconds=300)
-    async def mainLoop(self):
+    async def main_loop(self):
         if not self.send_event_notifications.is_running():
             self.send_event_notifications.start()
 
     @tasks.loop(seconds=10)
     async def send_event_notifications(self):
         for game in ["gge", "e4k"]:
-            self.cursor.execute(f"SELECT * FROM {game}_events WHERE new = 1")
-            new_events = self.cursor.fetchall()
+            connection = self.pool.getconn()
+            cursor = connection.cursor()
+            cursor.execute(f"SELECT * FROM {game}_events WHERE new = 1")
+            new_events = cursor.fetchall()
+            self.pool.putconn(connection)
             for event in new_events:
                 if event[1] > int(time.time()):
                     names = self.get_event_names(event)
@@ -68,8 +67,11 @@ class Bot(commands.Bot):
                             except Exception as e:
                                 logging.error(f""""Failed to publish message: {e}""")
 
-                        self.cursor.execute(f"UPDATE {game}_events SET new = 0 WHERE id = {event[0]}")
-                        self.connection.commit()
+                        connection = self.pool.getconn()
+                        cursor = connection.cursor()
+                        cursor.execute(f"UPDATE {game}_events SET new = 0 WHERE id = {event[0]}")
+                        connection.commit()
+                        self.pool.putconn(connection)
 
     def get_event_names(self, event):
         if event[0] == 7:
