@@ -1,11 +1,11 @@
-# fly.toml file generated for ancient-wildflower-9311 on 2023-01-27T17:09:45+01:00
+# fly.toml file generated on 2023-01-27T17:09:45+01:00
+#
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+#
 
-app = "ancient-wildflower-9311"
-kill_signal = "SIGINT"
-kill_timeout = 5
-processes = []
+primary_region = 'cdg'
 
-[env]
+[build]
 
-[experimental]
-  auto_rollback = true
+[[vm]]
+  size = 'shared-cpu-1x'

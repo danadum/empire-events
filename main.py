@@ -1,38 +1,51 @@
-from threading import Thread
 import os
-from dotenv import load_dotenv
-from firebase import firebase
-from main_socket import MainSocket
-from main_socket_e4k import MainSocketE4K
-from bot import Bot
 import time
+from threading import Thread
+import psycopg2
 
-load_dotenv()
+from bot import Bot
+from main_socket import MainSocket
 
-NOM = os.getenv("NOM")
-MDP = os.getenv("PASSWORD")
 
-NOM_E4K = os.getenv("NOM_E4K")
-MDP_E4K = os.getenv("PASSWORD_E4K")
+GGE_USERNAME = os.getenv("GGE_USERNAME")
+GGE_PASSWORD = os.getenv("GGE_PASSWORD")
+
+E4K_USERNAME = os.getenv("E4K_USERNAME")
+E4K_PASSWORD = os.getenv("E4K_PASSWORD")
+
+POSTGRES_HOST = os.getenv("POSTGRES_HOST")
+POSTGRES_DB = os.getenv("POSTGRES_DB")
+POSTGRES_USER = os.getenv("POSTGRES_USER")
+POSTGRES_PASSWORD = os.getenv("POSTGRES_PASSWORD")
+POSTGRES_PORT = os.getenv("POSTGRES_PORT")
+
+DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
+
 
 if __name__ == "__main__":
-    bot = Bot("%", None)
+    bot = Bot("%", None, None)
 
     time.sleep(2)
 
-    base = firebase.FirebaseApplication("https://gge-bot-default-rtdb.europe-west1.firebasedatabase.app", None)
-    bot.set_base(base)
+    connection = psycopg2.connect(host=POSTGRES_HOST, database=POSTGRES_DB, user=POSTGRES_USER, password=POSTGRES_PASSWORD, port=POSTGRES_PORT)
+    cursor = connection.cursor()
+    bot.set_connection(connection)
+    bot.set_cursor(cursor)
+
+    cursor.execute("CREATE TABLE IF NOT EXISTS gge_events (id INT PRIMARY KEY, end_time INT, content TEXT, discount INT, new INT)")
+    cursor.execute("CREATE TABLE IF NOT EXISTS e4k_events (id INT PRIMARY KEY, end_time INT, content TEXT, discount INT, new INT)")
+    connection.commit()
 
     time.sleep(2)
 
-    socket = MainSocket("wss://ep-live-fr1-game.goodgamestudios.com/", base, NOM, MDP)
-    Thread(target=socket.run_forever, kwargs={'reconnect': 600}).start()
+    gge_socket = MainSocket(connection, cursor, "wss://ep-live-fr1-game.goodgamestudios.com/", "EmpireEx_3", GGE_USERNAME, GGE_PASSWORD)
+    Thread(target=gge_socket.run_forever, kwargs={'reconnect': 600}).start()
 
     time.sleep(2)
     
-    socket_e4k = MainSocketE4K("ws://e4k-live-int4-game.goodgamestudios.com/", base, NOM_E4K, MDP_E4K)
-    Thread(target=socket_e4k.run_forever, kwargs={'reconnect': 600}).start()
+    e4k_socket = MainSocket(connection, cursor, "ws://e4k-live-int4-game.goodgamestudios.com/", "EmpirefourkingdomsExGG_34", E4K_USERNAME, E4K_PASSWORD)
+    Thread(target=e4k_socket.run_forever, kwargs={'reconnect': 600}).start()
 
     time.sleep(2)
 
-    bot.run(os.getenv("TOKEN"))
+    bot.run(DISCORD_TOKEN)

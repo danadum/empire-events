@@ -1,0 +1,42 @@
+name: Deploy 🚀
+
+on:
+  workflow_dispatch:
+  push:
+
+concurrency:
+  group: ${{ github.workflow }}
+
+jobs:
+  deploy:
+    name: Deploy 🚀
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      GGE_USERNAME: ${{ secrets.GGE_USERNAME }}
+      GGE_PASSWORD: ${{ secrets.GGE_PASSWORD }}
+      E4K_USERNAME: ${{ secrets.E4K_USERNAME }}
+      E4K_PASSWORD: ${{ secrets.E4K_PASSWORD }}
+      POSTGRES_HOST: ${{ secrets.POSTGRES_HOST }}
+      POSTGRES_DB: ${{ secrets.POSTGRES_DB }}
+      POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
+      POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+      POSTGRES_PORT: ${{ secrets.POSTGRES_PORT }}
+      DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}
+
+    steps:
+      - name: Checkout 🛎️
+        uses: actions/checkout@v4
+
+      - name: Setup flyctl 🔧
+        uses: superfly/flyctl-actions/setup-flyctl@master
+
+      - name: Configure Secrets 🔐
+        run: flyctl -a ${{ secrets.FLY_APP_NAME }} secrets set GGE_USERNAME="$GGE_USERNAME" GGE_PASSWORD="$GGE_PASSWORD" E4K_USERNAME="$E4K_USERNAME" E4K_PASSWORD="$E4K_PASSWORD" POSTGRES_HOST="$POSTGRES_HOST" POSTGRES_DB="$POSTGRES_DB" POSTGRES_USER="$POSTGRES_USER" POSTGRES_PASSWORD="$POSTGRES_PASSWORD" POSTGRES_PORT="$POSTGRES_PORT" DISCORD_TOKEN="$DISCORD_TOKEN" --stage
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+
+      - name: Deploy 🚀
+        run: flyctl -a ${{ secrets.FLY_APP_NAME }} deploy --remote-only
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}

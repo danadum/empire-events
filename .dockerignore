@@ -1,10 +1,11 @@
-# flyctl launch added from .idea\.gitignore
-# Default ignored files
-.idea\shelf
-.idea\workspace.xml
-
-# flyctl launch added from venv\.gitignore
-# created by virtualenv automatically
-venv\**\*
+__pycache__
+venv
 .env
+.env.example
+.git
+.github
+.gitignore
+.dockerignore
+Dockerfile
 fly.toml
+README.md

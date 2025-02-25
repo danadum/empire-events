@@ -1,159 +1,146 @@
-import json
 import math
 import logging
-from datetime import datetime
 from threading import Thread
 import time
-import websocket
-from secondary_socket import SecondarySocket
 import traceback
 
-class MainSocket(websocket.WebSocketApp):
-    def __init__(self, url, base, nom, mdp):
-        super().__init__(url, on_open=self.on_open, on_message=self.on_message, on_error=self.on_error, on_close=self.on_close)
-        self.base = base
-        self.nom = nom
-        self.mdp = mdp
-        self.details_cp = None
-        self.dernier_gaa = -1
-        self.roue = -1
-        self.voyante = -1
-        self.coms_en_mouvement = []
-        self.attaques_en_cours = []
-        self.temp_serveur = None
+from pygge.gge_socket import GgeSocket
+from secondary_socket import SecondarySocket
+
+
+class MainSocket(GgeSocket):
+    def __init__(self, connection, cursor, url, server_header, username, password):
+        super().__init__(url, server_header, on_open=self.on_open, on_message=self.on_message, on_error=self.on_error, on_close=self.on_close)
+        self.game = "GGE" if server_header.startswith("EmpireEx") else "E4K"
+        self.connection = connection
+        self.cursor = cursor
+        self.username = username
+        self.password = password
         self.temp_socket = None
 
     def on_open(self, ws):
-        logging.error(f"### [{datetime.now()}] Main socket GGE connected ###")
-        time.sleep(1)
-        self.send("""<msg t='sys'><body action='verChk' r='0'><ver v='166' /></body></msg>""")
-        self.send("""<msg t='sys'><body action='autoJoin' r='-1'></body></msg>""")
-        self.send("""<msg t='sys'><body action='login' r='0'><login z='EmpireEx_3'><nick><![CDATA[]]></nick><pword><![CDATA[1065004%fr%0]]></pword></login></body></msg>""")
-        self.send(f"""%xt%EmpireEx_3%lli%1%{{"CONM":175,"RTM":24,"ID":0,"PL":1,"NOM":"{self.nom}","PW":"{self.mdp}","LT":null,"LANG":"fr","DID":"0","AID":"1674256959939529708","KID":"","REF":"https://empire.goodgamestudios.com","GCI":"","SID":9,"PLFID":1}}%""")
+        logging.error(f"### Main socket {self.game} connected ###")
+        Thread(target=self.run).start()
 
     def run(self):
+        self.init_socket()
+        Thread(target=self.keep_alive).start()
+        if self.game == "GGE":
+            self.login(self.username, self.password)
+        else:
+            self.login_e4k(self.username, self.password)
+        Thread(target=self.offerings_thread).start()
+        Thread(target=self.attacks_thread).start()
+        Thread(target=self.events_thread).start()
+
+    def offerings_thread(self):
         while self.sock is not None:
-            self.send("""%xt%EmpireEx_3%pin%1%<RoundHouseKick>%""")
-            self.send("""%xt%EmpireEx_3%sei%1%{}%""")
-            self.send("""%xt%EmpireEx_3%gcs%1%{}%""")
-            if self.details_cp is not None:
-                self.send(f"""%xt%EmpireEx_3%gaa%1%{{"KID":0,"AX1":{self.details_cp[1] // 13 * 13},"AY1":{self.details_cp[2] // 13 * 13},"AX2":{12 + self.details_cp[1] // 13 * 13},"AY2":{12 + self.details_cp[2] // 13 * 13}}}%""")
+            offerings_response = self.get_offerings_status()
+            if offerings_response["payload"]["status"] == 0:
+                if offerings_response["payload"]["data"]["CHR"][0]["FOA"] > 0:
+                    self.make_offering(1, 6001)
+                elif offerings_response["payload"]["data"]["CHR"][1]["FOA"] > 0:
+                    self.make_offering(2, 6002)
+                elif offerings_response["payload"]["data"]["CHR"][2]["FOA"] > 0:
+                    self.make_offering(3, 6003)
+            time.sleep(3600)
+
+    def attacks_thread(self):
+        while self.sock is not None:
+            castles_response = self.get_castles()
+            great_empire = next(filter(lambda kingdom: kingdom["KID"] == 0, castles_response["payload"]["data"]["C"]))
+            main_castle = next(filter(lambda castle: castle["AI"][0] == 1, great_empire["AI"]))["AI"]
+            map_response = self.get_map_chunk(0, main_castle[1] // 13 * 13, main_castle[2] // 13 * 13)
+            for map_object in map_response["payload"]["data"]["AI"]:
+                if len(map_object) == 7 and map_object[0] == 2 and map_object[5] < 0:
+                    movements_response = self.get_movements()
+                    movements = [movement for movement in movements_response["payload"]["data"]["M"] if movement["M"]["OID"] == main_castle[4] and movement.get("UM") is not None]
+                    used_lords = [movement["UM"]["L"].get("ID") for movement in movements]
+                    current_attacks = [movement["M"]["TA"] for movement in movements if len(movement["M"]["TA"]) == 7 and movement["M"]["TA"][0] == 2]
+                    if next(filter(lambda attack_target: attack_target[1] == map_object[1] and attack_target[2] == map_object[2], current_attacks), None) is None:
+                        target_response = self.get_target_infos(0, main_castle[1], main_castle[2], map_object[1], map_object[2])
+                        lord = next(filter(lambda com: com["ID"] not in used_lords, target_response["payload"]["data"]["gli"]["C"]), None)
+                        unit_type = None
+                        if next(filter(lambda obj: obj[0] == 9, target_response["payload"]["data"]["gui"]["I"]), [0, 0])[1] > 320:
+                            unit_type = 9
+                        elif next(filter(lambda obj: obj[0] == 10, target_response["payload"]["data"]["gui"]["I"]), [0, 0])[1] > 320:
+                            unit_type = 10
+                        if lord is not None and unit_type is not None:
+                            level = math.floor(1.9 * map_object[4] ** 0.555) + 1
+                            max_units = min(260, 5 * level + 8) if level <= 69 else 320
+                            flank_limit = math.ceil(0.2 * max_units)
+                            front_limit = max_units - 2 * flank_limit
+                            waves = [{"L": {"T": [], "U": [unit_type, flank_limit]}, "R": {"T": [], "U": [unit_type, flank_limit]}, "M": {"T": [], "U": []}}]
+                            final_wave = [[unit_type, 100 + level]]
+                            self.send_attack(0, main_castle[1], main_castle[2], map_object[1], map_object[2], waves, lord["ID"], horses_type=1007, final_wave=final_wave)
+                            logging.error(f"""GGE attacking NPC at position {map_object[1]}:{map_object[2]}""")
+                            time.sleep(5)
+            time.sleep(600)
+
+    def events_thread(self):
+        while self.sock is not None:
+            events_response = self.get_events()
+            for event in events_response["payload"]["data"]["E"]:
+                if event["RS"] > 30 and event["EID"] in [7, 75, 90]:
+                    end_time = int(event['RS']) + int(time.time())
+                    content = str(event.get("WID") or event.get("BID") or event.get("TID"))
+                    discount = event.get('DIS', 0)
+                    self.cursor.execute(f"SELECT * FROM {self.game.lower()}_events WHERE id = {event['EID']}")
+                    old_event = self.cursor.fetchone()
+                    if old_event is None:
+                        self.cursor.execute(f"INSERT INTO {self.game.lower()}_events (id, end_time, content, discount, new) VALUES ({event['EID']}, {end_time}, '{content}', {discount}, 1)")
+                        self.connection.commit()
+                    elif old_event[1] < int(time.time()) or old_event[2] != content or old_event[3] != discount:
+                        self.cursor.execute(f"UPDATE {self.game.lower()}_events SET end_time = {end_time}, content = '{content}', discount = {discount}, new = 1 WHERE id = {event['EID']}")
+                        self.connection.commit()
+                elif event["EID"] == 106 and (self.temp_socket is None or self.temp_socket.sock is None):
+                    if event["IPS"] == 0:
+                        if event["TSID"] in [16, 18]:
+                            self.buy_package_generic(0, 0, 106, 2358, 1)
+                            self.choose_outer_realm_castle(40)
+                        else:
+                            self.choose_outer_realm_castle(31, only_rubies=1)
+                    token_response = self.get_outer_realm_token()
+                    if token_response["payload"]["data"]['TSIP'].startswith('e4k'):
+                        temp_socket_url = f"ws://{token_response['payload']['data']['TSIP']}"
+                    else:
+                        temp_socket_url = f"wss://{token_response['payload']['data']['TSIP']}"
+                    self.temp_socket = SecondarySocket(self.connection, self.cursor, self.game, temp_socket_url, token_response["payload"]["data"]["TSZ"], token_response["payload"]["data"]["TLT"], "OR")
+                    Thread(target=self.temp_socket.run_forever, kwargs={'reconnect': False}).start()
+                elif event["EID"] == 113 and (self.temp_socket is None or self.temp_socket.sock is None):
+                    if event["IPS"] == 0:
+                        self.choose_bth_castle(34, only_rubies=1)
+                    token_response = self.get_bth_token()
+                    if token_response["payload"]["data"]['TSIP'].startswith('e4k'):
+                        temp_socket_url = f"ws://{token_response['payload']['data']['TSIP']}"
+                    else:
+                        temp_socket_url = f"wss://{token_response['payload']['data']['TSIP']}"
+                    self.temp_socket = SecondarySocket(self.connection, self.cursor, self.game, temp_socket_url, token_response["payload"]["data"]["TSZ"], token_response["payload"]["data"]["TLT"], "BTH")
+                    Thread(target=self.temp_socket.run_forever, kwargs={'reconnect': False}).start()
+                elif event["EID"] == 117 and event.get("FTDC") == 1:
+                    self.make_divination()
+                elif event["EID"] == 15 and event.get("OP") is not None and event.get("OP")[0] < 3:
+                    self.spin_classic_lucky_wheel()
             time.sleep(60)
 
     def on_message(self, ws, message):
-        message = message.decode('UTF-8')
-        if message[:12] == "%xt%lli%1%0%":
-            Thread(target=self.run).start()
-        elif message[:10] == "%xt%lli%1%" and message[10] != "0":
-            self.close()
-        elif message[:12] == "%xt%sei%1%0%":
-            data = json.loads(message[12:-1])
-            for event in data["E"]:
-                if event["RS"] > 30 and event["EID"] in [7, 75, 90]:
-                    temps = int(event['RS']) + int(time.time())
-                    contenu = str(event.get("WID") or event.get("BID") or event.get("TID"))
-                    reduction = event.get('DIS') or 0
-                    old_event = self.base.get(f"/events/{event['EID']}", None)
-                    if old_event["temps"] < int(time.time()) or old_event["contenu"] != contenu or old_event["reduction"] != reduction:
-                        self.base.patch(f"/events/{event['EID']}", {"temps": temps, "contenu": contenu, "reduction": reduction, "nouveau": 1})
-                elif event["EID"] == 106 and self.temp_serveur != ["RE", event["TSID"]]:
-                    if event["IPS"] == 0:
-                        if event["TSID"] in [16, 18]:
-                            self.send("""%xt%EmpireEx_3%sbp%1%{"PID":2358,"BT":0,"TID":106,"AMT":1,"KID":0,"AID":-1,"PC2":-1,"BA":0,"PWR":0,"_PO":-1}%""")
-                            self.send("""%xt%EmpireEx_3%tsc%1%{"ID":40,"OC2":0,"PWR":0,"GST":2}%""")
-                        else:
-                            self.send("""%xt%EmpireEx_3%tsc%1%{"ID":31,"OC2":1,"PWR":0,"GST":2}%""")
-                        time.sleep(1)
-                    self.send("""%xt%EmpireEx_3%glt%1%{"GST":2}%""")
-                    self.temp_serveur = ["RE", event["TSID"]]
-                elif event["EID"] == 113 and self.temp_serveur != ["LACIS", event["TSID"]]:
-                    if event["IPS"] == 0:
-                        self.send("""%xt%EmpireEx_3%tsc%1%{"ID":34,"OC2":1,"PWR":0,"GST":3}%""")
-                        time.sleep(1)
-                    self.send("""%xt%EmpireEx_3%glt%1%{"GST":3}%""")
-                    self.temp_serveur = ["LACIS", event["TSID"]]
-                elif event["EID"] == 117 and event.get("FTDC") == 1:
-                    now = int(time.time())
-                    if now > self.voyante + 30:
-                        self.voyante = now
-                        self.send("""%xt%EmpireEx_3%ftl%1%{}%""")
-                elif event["EID"] == 15 and event.get("OP") is not None and event.get("OP")[0] < 3:
-                    now = int(time.time())
-                    if now > self.roue + 30:
-                        self.roue = now
-                        self.send("""%xt%EmpireEx_3%lws%1%{"LWET":0}%""")
-        elif message[:12] == "%xt%gcs%1%0%":
-            data = json.loads(message[12:-1])
-            if data["CHR"][0]["FOA"] > 0:
-                self.send("""%xt%EmpireEx_3%sct%1%{"CID":1,"OID":6001,"IF":1}%""")
-            elif data["CHR"][1]["FOA"] > 0:
-                self.send("""%xt%EmpireEx_3%sct%1%{"CID":2,"OID":6002,"IF":1}%""")
-            elif data["CHR"][2]["FOA"] > 0:
-                self.send("""%xt%EmpireEx_3%sct%1%{"CID":3,"OID":6003,"IF":1}%""")
-        elif message[:17] == "%xt%core_poe%1%0%":
-            data = json.loads(message[17:-1])
-            if data["remainingTime"] > 30 and data["type"] == 1:
-                temps = data["remainingTime"] + int(time.time())
-                old_event = self.base.get("/events/999", None)
-                if old_event["temps"] < int(time.time()) or old_event["contenu"] != data["bonusPremium"]:
-                    self.base.patch("/events/999", {"temps": temps, "contenu": data["bonusPremium"], "reduction": 0, "nouveau": 1})
-        elif message[:12] == "%xt%glt%1%0%":
-            data = json.loads(message[12:-1])
-            self.temp_socket = SecondarySocket(f"wss://{data['TSIP']}", self.base, data["TSZ"], data["TLT"], self.temp_serveur[0], self, "/events")
-            Thread(target=self.temp_socket.run_forever, kwargs={'reconnect': False}).start()
-        elif message[:12] == "%xt%gbd%1%0%":
-            data = json.loads(message[12:-1])
-            vert = next(filter(lambda monde: monde["KID"] == 0, data["gcl"]["C"]))
-            self.details_cp = next(filter(lambda chateau: chateau["AI"][0] == 1, vert["AI"]))["AI"]
-        elif message[:12] == "%xt%gaa%1%0%":
-            data = json.loads(message[12:-1])
-            now = int(time.time())
-            if now > self.dernier_gaa + 300:
-                self.dernier_gaa = now
-                Thread(target=self.launch_attacks, args=(data, )).start()
-        elif message[:12] == "%xt%gam%1%0%" and self.details_cp is not None:
-            data = json.loads(message[12:-1])
-            moves = [move for move in data["M"] if move["M"]["OID"] == self.details_cp[4] and move.get("UM") is not None]
-            self.coms_en_mouvement = [move["UM"]["L"].get("ID") for move in moves]
-            self.attaques_en_cours = [move["M"]["TA"] for move in moves if len(move["M"]["TA"]) == 7 and move["M"]["TA"][0] == 2]
-        elif message[:12] == "%xt%adi%1%0%":
-            data = json.loads(message[12:-1])
-            commandant = next(filter(lambda com: com["ID"] not in self.coms_en_mouvement, data["gli"]["C"]), None)
-            type_soldats = 0
-            if next(filter(lambda obj: obj[0] == 9, data["gui"]["I"]), [0, 0])[1] > 320:
-                type_soldats = 9
-            elif next(filter(lambda obj: obj[0] == 10, data["gui"]["I"]), [0, 0])[1] > 320:
-                type_soldats = 10
-            if commandant is not None and type_soldats != 0:
-                level = math.floor(1.9 * data["gaa"]["AI"][4] ** 0.555) + 1
-                max_soldats = min(260, 5 * level + 8) if level <= 69 else 320
-                limite_flanc = math.ceil(0.2 * max_soldats)
-                limite_front = max_soldats - 2 * limite_flanc
-                vague = f"""{{"L":{{"T":[],"U":[[{type_soldats},{limite_flanc}]]}},"R":{{"T":[],"U":[[{type_soldats},{limite_flanc}]]}},"M":{{"T":[],"U":[]}}}}"""
-                vagues = f"""[{",".join(1 * [vague])}]"""
-                cour = f"""[[{type_soldats},{100 + level}]]"""
-                attaque = f"""%xt%EmpireEx_3%cra%1%{{"SX":{self.details_cp[1]},"SY":{self.details_cp[2]},"TX":{data["gaa"]["AI"][1]},"TY":{data["gaa"]["AI"][2]},"KID":0,"LID":{commandant["ID"]},"WT":0,"HBW":1007,"BPC":0,"ATT":0,"AV":0,"LP":0,"FC":0,"PTT":0,"SD":0,"ICA":0,"CD":99,"A":{vagues},"BKS":[],"AST":[],"RW":{cour}}}%"""
-                logging.error(f"""GGE attacking NPC at position {data["gaa"]["AI"][1]}:{data["gaa"]["AI"][2]}""")
-                self.send(attaque)
-
-    def launch_attacks(self, data):
-        for map_object in data["AI"]:
-            if len(map_object) == 7 and map_object[0] == 2 and map_object[5] < 0:
-                self.send("""%xt%EmpireEx_3%gam%1%{}%""")
-                time.sleep(1)
-                if next(filter(lambda fc: fc[1] == map_object[1] and fc[2] == map_object[2], self.attaques_en_cours), None) is None:
-                    self.send(f"""%xt%EmpireEx_3%adi%1%{{"SX":{self.details_cp[1]},"SY":{self.details_cp[2]},"TX":{map_object[1]},"TY":{map_object[2]},"KID":0}}%""")
-                    time.sleep(5)
+        message = self.parse_response(message)
+        if message["type"] == "json" and message["payload"]["command"] == "core_poe" and message["payload"]["status"] == 0:
+            if message["payload"]["data"]["remainingTime"] > 30 and message["payload"]["data"]["type"] == 1:
+                end_time = message["payload"]["data"]["remainingTime"] + int(time.time())
+                self.cursor.execute(f"SELECT * FROM {self.game.lower()}_events WHERE id = 999")
+                old_event = self.cursor.fetchone()
+                if old_event is None:
+                    self.cursor.execute(f"INSERT INTO {self.game.lower()}_events (id, end_time, content, discount, new) VALUES (999, {end_time}, '{message['payload']['data']['bonusPremium']}', 0, 1)")
+                    self.connection.commit()
+                elif old_event[1] < int(time.time()) or old_event[2] != message["payload"]["data"]["bonusPremium"]:
+                    self.cursor.execute(f"UPDATE {self.game.lower()}_events SET end_time = {end_time}, content = '{message['payload']['data']['bonusPremium']}', discount = 0, new = 1 WHERE id = 999")
+                    self.connection.commit()
 
     def on_error(self, ws, error):
-        logging.error("### error in main socket GGE ###")
+        logging.error(f"### error in main socket {self.game} ###")
         logging.error(traceback.format_exc())
         self.close()
 
     def on_close(self, ws, close_status_code, close_msg):
-        logging.error(f"### [{datetime.now()}] Main socket closed GGE ###")
-
-    def close(self):
-        if self.sock is not None:
-            self.sock.close()
-            self.sock = None
+        logging.error(f"### Main socket {self.game} closed ###")

@@ -1,19 +1,20 @@
-FROM python:3.10-slim AS build
-RUN apt-get update && apt-get install -y --no-install-recommends build-essential gcc
+FROM python:3.12-alpine AS base
 
-RUN python -m venv /opt/venv
-ENV PATH="/opt/venv/bin:$PATH"
+WORKDIR /app
+
+FROM base AS build
+
+RUN python -m venv venv
+ENV PATH="/app/venv/bin:$PATH"
 
 COPY requirements.txt .
 RUN pip install -r requirements.txt
 
+FROM base AS final
 
-FROM python:3.10-alpine
+COPY --from=build /app/venv venv
+ENV PATH="/app/venv/bin:$PATH"
 
-WORKDIR /bot
+COPY . .
 
-COPY --from=build /opt/venv /bot/venv
-ENV PATH="/bot/venv/bin:$PATH"
-
-COPY . /bot
-CMD python main.py
+CMD ["python", "main.py"]
