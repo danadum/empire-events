@@ -41,6 +41,7 @@ class Bot(commands.Bot):
             new_events = cursor.fetchall()
             self.pool.putconn(connection)
             for event in new_events:
+                logging.error(f"events: {new_events}")
                 if event[1] > int(time.time()):
                     names = self.get_event_names(event)
                     if names is not None:
