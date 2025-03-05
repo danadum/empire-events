@@ -143,8 +143,8 @@ class MainSocket(GgeSocket):
                 cursor = connection.cursor()
                 cursor.execute(f"SELECT * FROM {self.game.lower()}_events WHERE id = 999")
                 old_event = cursor.fetchone()
-                print("old event:", old_event)
-                print("message:", message)
+                logging.error(f"old event: {old_event}")
+                logging.error(f"message: {message}")
                 if old_event is None:
                     cursor.execute(f"INSERT INTO {self.game.lower()}_events (id, end_time, content, discount, new) VALUES (999, {end_time}, '{message['payload']['data']['bonusPremium']}', 0, 1)")
                     connection.commit()
