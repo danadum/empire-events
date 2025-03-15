@@ -32,7 +32,7 @@ class Bot(commands.Bot):
         if not self.send_event_notifications.is_running():
             self.send_event_notifications.start()
 
-    @tasks.loop(seconds=10)
+    @tasks.loop(seconds=60)
     async def send_event_notifications(self):
         for game in ["gge", "e4k"]:
             connection = self.pool.getconn()
