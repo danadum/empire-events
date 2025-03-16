@@ -16,12 +16,20 @@ class MainSocket(GgeSocket):
         self.username = username
         self.password = password
         self.temp_socket = None
+        self.events = []
 
     def on_open(self, ws):
         logging.error(f"### Main socket {self.game} connected ###")
         Thread(target=self.run).start()
 
     def run(self):
+        connection = self.pool.getconn()
+        cursor = connection.cursor()
+        cursor.execute(f"SELECT * FROM {self.game.lower()}_events")
+        self.events = cursor.fetchall()
+        self.events = [list(event) for event in self.events]
+        self.pool.putconn(connection)
+
         self.init_socket()
         Thread(target=self.keep_alive).start()
         if self.game == "GGE":
@@ -92,17 +100,24 @@ class MainSocket(GgeSocket):
                             end_time = int(event['RS']) + int(time.time())
                             content = str(event.get("WID") or event.get("BID") or event.get("TID"))
                             discount = event.get('DIS', 0)
-                            connection = self.pool.getconn()
-                            cursor = connection.cursor()
-                            cursor.execute(f"SELECT * FROM {self.game.lower()}_events WHERE id = {event['EID']}")
-                            old_event = cursor.fetchone()
+                            old_event = next(filter(lambda e: e[0] == event['EID'], self.events), None)
                             if old_event is None:
+                                connection = self.pool.getconn()
+                                cursor = connection.cursor()
                                 cursor.execute(f"INSERT INTO {self.game.lower()}_events (id, end_time, content, discount, new) VALUES ({event['EID']}, {end_time}, '{content}', {discount}, 1)")
                                 connection.commit()
+                                self.pool.putconn(connection)
+                                self.events.append([event['EID'], end_time, content, discount, 1])
                             elif old_event[1] < int(time.time()) or old_event[2] != content or old_event[3] != discount:
+                                connection = self.pool.getconn()
+                                cursor = connection.cursor()
                                 cursor.execute(f"UPDATE {self.game.lower()}_events SET end_time = {end_time}, content = '{content}', discount = {discount}, new = 1 WHERE id = {event['EID']}")
                                 connection.commit()
-                            self.pool.putconn(connection)
+                                self.pool.putconn(connection)
+                                old_event[1] = end_time
+                                old_event[2] = content
+                                old_event[3] = discount
+                                old_event[4] = 1
                         elif event["EID"] == 106 and (self.temp_socket is None or self.temp_socket.sock is None):
                             if event["IPS"] == 0:
                                 if event["TSID"] in [16, 18]:
@@ -119,6 +134,8 @@ class MainSocket(GgeSocket):
                             Thread(target=self.temp_socket.run_forever, kwargs={'reconnect': False}).start()
                         elif event["EID"] == 113 and (self.temp_socket is None or self.temp_socket.sock is None):
                             if event["IPS"] == 0:
+                                if event["RJT"] <= 0:
+                                    continue
                                 self.choose_bth_castle(34, only_rubies=1)
                             token_response = self.get_bth_token()
                             if token_response["payload"]["data"]['TSIP'].startswith('e4k'):
@@ -142,17 +159,24 @@ class MainSocket(GgeSocket):
         if message["type"] == "json" and message["payload"]["command"] == "core_poe" and message["payload"]["status"] == 0:
             if message["payload"]["data"]["remainingTime"] > 30 and message["payload"]["data"]["type"] == 1:
                 end_time = message["payload"]["data"]["remainingTime"] + int(time.time())
-                connection = self.pool.getconn()
-                cursor = connection.cursor()
-                cursor.execute(f"SELECT * FROM {self.game.lower()}_events WHERE id = 999")
-                old_event = cursor.fetchone()
+                old_event = next(filter(lambda e: e[0] == 999, self.events), None)
                 if old_event is None:
+                    connection = self.pool.getconn()
+                    cursor = connection.cursor()
                     cursor.execute(f"INSERT INTO {self.game.lower()}_events (id, end_time, content, discount, new) VALUES (999, {end_time}, '{message['payload']['data']['bonusPremium']}', 0, 1)")
                     connection.commit()
+                    self.pool.putconn(connection)
+                    self.events.append([999, end_time, message["payload"]["data"]["bonusPremium"], 0, 1])
                 elif old_event[1] < int(time.time()) or old_event[2] != str(message["payload"]["data"]["bonusPremium"]):
+                    connection = self.pool.getconn()
+                    cursor = connection.cursor()
                     cursor.execute(f"UPDATE {self.game.lower()}_events SET end_time = {end_time}, content = '{message['payload']['data']['bonusPremium']}', discount = 0, new = 1 WHERE id = 999")
                     connection.commit()
-                self.pool.putconn(connection)
+                    self.pool.putconn(connection)
+                    old_event[1] = end_time
+                    old_event[2] = message["payload"]["data"]["bonusPremium"]
+                    old_event[3] = 0
+                    old_event[4] = 1
 
     def on_error(self, ws, error):
         logging.error(f"### error in main socket {self.game} ###")

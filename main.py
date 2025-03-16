@@ -41,11 +41,13 @@ if __name__ == "__main__":
 
     gge_socket = MainSocket(pool, "wss://ep-live-fr1-game.goodgamestudios.com/", "EmpireEx_3", GGE_USERNAME, GGE_PASSWORD)
     Thread(target=gge_socket.run_forever, kwargs={'reconnect': 600}).start()
+    bot.set_gge_socket(gge_socket)
 
     time.sleep(2)
     
     e4k_socket = MainSocket(pool, "ws://e4k-live-int4-game.goodgamestudios.com/", "EmpirefourkingdomsExGG_34", E4K_USERNAME, E4K_PASSWORD)
     Thread(target=e4k_socket.run_forever, kwargs={'reconnect': 600}).start()
+    bot.set_e4k_socket(e4k_socket)
 
     time.sleep(2)
 

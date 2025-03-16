@@ -18,6 +18,8 @@ class Bot(commands.Bot):
         self.channel_gge_en = 956915826894708766
         self.channel_e4k_fr = 956916103869792266
         self.channel_e4k_en = 956915929982328892
+        self.gge_socket = None
+        self.e4k_socket = None
 
         @self.event
         async def on_ready():
@@ -26,6 +28,12 @@ class Bot(commands.Bot):
     
     def set_pool(self, pool):
         self.pool = pool
+    
+    def set_gge_socket(self, gge_socket):
+        self.gge_socket = gge_socket
+    
+    def set_e4k_socket(self, e4k_socket):
+        self.e4k_socket = e4k_socket
 
     @tasks.loop(seconds=300)
     async def main_loop(self):
@@ -34,12 +42,12 @@ class Bot(commands.Bot):
 
     @tasks.loop(seconds=60)
     async def send_event_notifications(self):
-        for game in ["gge", "e4k"]:
-            connection = self.pool.getconn()
-            cursor = connection.cursor()
-            cursor.execute(f"SELECT * FROM {game}_events WHERE new = 1")
-            new_events = cursor.fetchall()
-            self.pool.putconn(connection)
+        for socket in [self.gge_socket, self.e4k_socket]:
+            game = socket.game.lower()
+            events = socket.events
+            if socket.temp_socket is not None:
+                events += socket.temp_socket.events
+            new_events = list(filter(lambda event: event[4] == 1, events))
             for event in new_events:
                 if event[1] > int(time.time()):
                     names = self.get_event_names(event)
@@ -72,6 +80,7 @@ class Bot(commands.Bot):
                         cursor.execute(f"UPDATE {game}_events SET new = 0 WHERE id = {event[0]}")
                         connection.commit()
                         self.pool.putconn(connection)
+                        event[4] = 0
 
     def get_event_names(self, event):
         if event[0] == 7:
