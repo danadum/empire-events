@@ -87,51 +87,54 @@ class MainSocket(GgeSocket):
             try:
                 events_response = self.get_events()
                 for event in events_response["payload"]["data"]["E"]:
-                    if event["RS"] > 30 and event["EID"] in [7, 75, 90]:
-                        end_time = int(event['RS']) + int(time.time())
-                        content = str(event.get("WID") or event.get("BID") or event.get("TID"))
-                        discount = event.get('DIS', 0)
-                        connection = self.pool.getconn()
-                        cursor = connection.cursor()
-                        cursor.execute(f"SELECT * FROM {self.game.lower()}_events WHERE id = {event['EID']}")
-                        old_event = cursor.fetchone()
-                        if old_event is None:
-                            cursor.execute(f"INSERT INTO {self.game.lower()}_events (id, end_time, content, discount, new) VALUES ({event['EID']}, {end_time}, '{content}', {discount}, 1)")
-                            connection.commit()
-                        elif old_event[1] < int(time.time()) or old_event[2] != content or old_event[3] != discount:
-                            cursor.execute(f"UPDATE {self.game.lower()}_events SET end_time = {end_time}, content = '{content}', discount = {discount}, new = 1 WHERE id = {event['EID']}")
-                            connection.commit()
-                        self.pool.putconn(connection)
-                    elif event["EID"] == 106 and (self.temp_socket is None or self.temp_socket.sock is None):
-                        if event["IPS"] == 0:
-                            if event["TSID"] in [16, 18]:
-                                self.buy_package_generic(0, 0, 106, 2358, 1)
-                                self.choose_outer_realm_castle(40)
+                    try:
+                        if event["RS"] > 30 and event["EID"] in [7, 75, 90]:
+                            end_time = int(event['RS']) + int(time.time())
+                            content = str(event.get("WID") or event.get("BID") or event.get("TID"))
+                            discount = event.get('DIS', 0)
+                            connection = self.pool.getconn()
+                            cursor = connection.cursor()
+                            cursor.execute(f"SELECT * FROM {self.game.lower()}_events WHERE id = {event['EID']}")
+                            old_event = cursor.fetchone()
+                            if old_event is None:
+                                cursor.execute(f"INSERT INTO {self.game.lower()}_events (id, end_time, content, discount, new) VALUES ({event['EID']}, {end_time}, '{content}', {discount}, 1)")
+                                connection.commit()
+                            elif old_event[1] < int(time.time()) or old_event[2] != content or old_event[3] != discount:
+                                cursor.execute(f"UPDATE {self.game.lower()}_events SET end_time = {end_time}, content = '{content}', discount = {discount}, new = 1 WHERE id = {event['EID']}")
+                                connection.commit()
+                            self.pool.putconn(connection)
+                        elif event["EID"] == 106 and (self.temp_socket is None or self.temp_socket.sock is None):
+                            if event["IPS"] == 0:
+                                if event["TSID"] in [16, 18]:
+                                    self.buy_package_generic(0, 0, 106, 2358, 1)
+                                    self.choose_outer_realm_castle(40)
+                                else:
+                                    self.choose_outer_realm_castle(31, only_rubies=1)
+                            token_response = self.get_outer_realm_token()
+                            if token_response["payload"]["data"]['TSIP'].startswith('e4k'):
+                                temp_socket_url = f"ws://{token_response['payload']['data']['TSIP']}"
                             else:
-                                self.choose_outer_realm_castle(31, only_rubies=1)
-                        token_response = self.get_outer_realm_token()
-                        if token_response["payload"]["data"]['TSIP'].startswith('e4k'):
-                            temp_socket_url = f"ws://{token_response['payload']['data']['TSIP']}"
-                        else:
-                            temp_socket_url = f"wss://{token_response['payload']['data']['TSIP']}"
-                        self.temp_socket = SecondarySocket(self.pool, self.game, temp_socket_url, token_response["payload"]["data"]["TSZ"], token_response["payload"]["data"]["TLT"], "OR")
-                        Thread(target=self.temp_socket.run_forever, kwargs={'reconnect': False}).start()
-                    elif event["EID"] == 113 and (self.temp_socket is None or self.temp_socket.sock is None):
-                        if event["IPS"] == 0:
-                            self.choose_bth_castle(34, only_rubies=1)
-                        token_response = self.get_bth_token()
-                        if token_response["payload"]["data"]['TSIP'].startswith('e4k'):
-                            temp_socket_url = f"ws://{token_response['payload']['data']['TSIP']}"
-                        else:
-                            temp_socket_url = f"wss://{token_response['payload']['data']['TSIP']}"
-                        self.temp_socket = SecondarySocket(self.pool, self.game, temp_socket_url, token_response["payload"]["data"]["TSZ"], token_response["payload"]["data"]["TLT"], "BTH")
-                        Thread(target=self.temp_socket.run_forever, kwargs={'reconnect': False}).start()
-                    elif event["EID"] == 117 and event.get("FTDC") == 1:
-                        self.make_divination()
-                    elif event["EID"] == 15 and event.get("OP") is not None and event.get("OP")[0] < 3:
-                        self.spin_classic_lucky_wheel()
+                                temp_socket_url = f"wss://{token_response['payload']['data']['TSIP']}"
+                            self.temp_socket = SecondarySocket(self.pool, self.game, temp_socket_url, token_response["payload"]["data"]["TSZ"], token_response["payload"]["data"]["TLT"], "OR")
+                            Thread(target=self.temp_socket.run_forever, kwargs={'reconnect': False}).start()
+                        elif event["EID"] == 113 and (self.temp_socket is None or self.temp_socket.sock is None):
+                            if event["IPS"] == 0:
+                                self.choose_bth_castle(34, only_rubies=1)
+                            token_response = self.get_bth_token()
+                            if token_response["payload"]["data"]['TSIP'].startswith('e4k'):
+                                temp_socket_url = f"ws://{token_response['payload']['data']['TSIP']}"
+                            else:
+                                temp_socket_url = f"wss://{token_response['payload']['data']['TSIP']}"
+                            self.temp_socket = SecondarySocket(self.pool, self.game, temp_socket_url, token_response["payload"]["data"]["TSZ"], token_response["payload"]["data"]["TLT"], "BTH")
+                            Thread(target=self.temp_socket.run_forever, kwargs={'reconnect': False}).start()
+                        elif event["EID"] == 117 and event.get("FTDC") == 1:
+                            self.make_divination()
+                        elif event["EID"] == 15 and event.get("OP") is not None and event.get("OP")[0] < 3:
+                            self.spin_classic_lucky_wheel()
+                    except Exception as e:
+                        logging.error(f"Error in events thread {self.game}: {e}")
             except Exception as e:
-                logging.error(f"Error in events thread {self.game}: {traceback.format_exc()}")
+                logging.error(f"Error in events thread {self.game}: {e}")
             time.sleep(60)
 
     def on_message(self, ws, message):
