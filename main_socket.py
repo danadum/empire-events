@@ -131,7 +131,7 @@ class MainSocket(GgeSocket):
                     elif event["EID"] == 15 and event.get("OP") is not None and event.get("OP")[0] < 3:
                         self.spin_classic_lucky_wheel()
             except Exception as e:
-                logging.error(f"Error in events thread {self.game}: {e}")
+                logging.error(f"Error in events thread {self.game}: {traceback.format_exc()}")
             time.sleep(60)
 
     def on_message(self, ws, message):
