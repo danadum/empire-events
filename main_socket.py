@@ -155,28 +155,31 @@ class MainSocket(GgeSocket):
             time.sleep(60)
 
     def on_message(self, ws, message):
-        message = self.parse_response(message)
-        if message["type"] == "json" and message["payload"]["command"] == "core_poe" and message["payload"]["status"] == 0:
-            if message["payload"]["data"]["remainingTime"] > 30 and message["payload"]["data"]["type"] == 1:
-                end_time = message["payload"]["data"]["remainingTime"] + int(time.time())
-                old_event = next(filter(lambda e: e[0] == 999, self.events), None)
-                if old_event is None:
-                    connection = self.pool.getconn()
-                    cursor = connection.cursor()
-                    cursor.execute(f"INSERT INTO {self.game.lower()}_events (id, end_time, content, discount, new) VALUES (999, {end_time}, '{message['payload']['data']['bonusPremium']}', 0, 1)")
-                    connection.commit()
-                    self.pool.putconn(connection)
-                    self.events.append([999, end_time, message["payload"]["data"]["bonusPremium"], 0, 1])
-                elif old_event[1] < int(time.time()) or old_event[2] != str(message["payload"]["data"]["bonusPremium"]):
-                    connection = self.pool.getconn()
-                    cursor = connection.cursor()
-                    cursor.execute(f"UPDATE {self.game.lower()}_events SET end_time = {end_time}, content = '{message['payload']['data']['bonusPremium']}', discount = 0, new = 1 WHERE id = 999")
-                    connection.commit()
-                    self.pool.putconn(connection)
-                    old_event[1] = end_time
-                    old_event[2] = message["payload"]["data"]["bonusPremium"]
-                    old_event[3] = 0
-                    old_event[4] = 1
+        try:
+            message = self.parse_response(message)
+            if message["type"] == "json" and message["payload"]["command"] == "core_poe" and message["payload"]["status"] == 0:
+                if message["payload"]["data"]["remainingTime"] > 30 and message["payload"]["data"]["type"] == 1:
+                    end_time = message["payload"]["data"]["remainingTime"] + int(time.time())
+                    old_event = next(filter(lambda e: e[0] == 999, self.events), None)
+                    if old_event is None:
+                        connection = self.pool.getconn()
+                        cursor = connection.cursor()
+                        cursor.execute(f"INSERT INTO {self.game.lower()}_events (id, end_time, content, discount, new) VALUES (999, {end_time}, '{message['payload']['data']['bonusPremium']}', 0, 1)")
+                        connection.commit()
+                        self.pool.putconn(connection)
+                        self.events.append([999, end_time, message["payload"]["data"]["bonusPremium"], 0, 1])
+                    elif old_event[1] < int(time.time()) or old_event[2] != str(message["payload"]["data"]["bonusPremium"]):
+                        connection = self.pool.getconn()
+                        cursor = connection.cursor()
+                        cursor.execute(f"UPDATE {self.game.lower()}_events SET end_time = {end_time}, content = '{message['payload']['data']['bonusPremium']}', discount = 0, new = 1 WHERE id = 999")
+                        connection.commit()
+                        self.pool.putconn(connection)
+                        old_event[1] = end_time
+                        old_event[2] = message["payload"]["data"]["bonusPremium"]
+                        old_event[3] = 0
+                        old_event[4] = 1
+        except Exception as e:
+            logging.error(f"Error in on_message {self.game}: {e}")
 
     def on_error(self, ws, error):
         logging.error(f"### error in main socket {self.game} ###")

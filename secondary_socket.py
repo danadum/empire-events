@@ -35,29 +35,32 @@ class SecondarySocket(GgeSocket):
             self.login_bth(self.token, sync=(self.game == "GGE"))
 
     def on_message(self, ws, message):
-        message = self.parse_response(message)
-        if message["type"] == "json" and message["payload"]["command"] == "core_poe" and message["payload"]["status"] == 0:
-            if message["payload"]["data"]["remainingTime"] > 30 and int(message["payload"]["data"]["type"]) == 1:
-                end_time = message["payload"]["data"]["remainingTime"] + int(time.time())
-                event_id = 998 if self.server_type == "OR" else 997
-                old_event = next(filter(lambda e: e[0] == event_id, self.events), None)
-                if old_event is None:
-                    connection = self.pool.getconn()
-                    cursor = connection.cursor()
-                    cursor.execute(f"INSERT INTO {self.game.lower()}_events (id, end_time, content, discount, new) VALUES ({event_id}, {end_time}, '{message['payload']['data']['bonusPremium']}', 0, 1)")
-                    connection.commit()
-                    self.pool.putconn(connection)
-                    self.events.append([event_id, end_time, message["payload"]["data"]["bonusPremium"], 0, 1])
-                elif old_event[1] < int(time.time()) or old_event[2] != str(message["payload"]["data"]["bonusPremium"]):
-                    connection = self.pool.getconn()
-                    cursor = connection.cursor()
-                    cursor.execute(f"UPDATE {self.game.lower()}_events SET end_time = {end_time}, content = '{message['payload']['data']['bonusPremium']}', discount = 0, new = 1 WHERE id = {event_id}")
-                    connection.commit()
-                    self.pool.putconn(connection)
-                    old_event[1] = end_time
-                    old_event[2] = message["payload"]["data"]["bonusPremium"]
-                    old_event[3] = 0
-                    old_event[4] = 1
+        try:
+            message = self.parse_response(message)
+            if message["type"] == "json" and message["payload"]["command"] == "core_poe" and message["payload"]["status"] == 0:
+                if message["payload"]["data"]["remainingTime"] > 30 and int(message["payload"]["data"]["type"]) == 1:
+                    end_time = message["payload"]["data"]["remainingTime"] + int(time.time())
+                    event_id = 998 if self.server_type == "OR" else 997
+                    old_event = next(filter(lambda e: e[0] == event_id, self.events), None)
+                    if old_event is None:
+                        connection = self.pool.getconn()
+                        cursor = connection.cursor()
+                        cursor.execute(f"INSERT INTO {self.game.lower()}_events (id, end_time, content, discount, new) VALUES ({event_id}, {end_time}, '{message['payload']['data']['bonusPremium']}', 0, 1)")
+                        connection.commit()
+                        self.pool.putconn(connection)
+                        self.events.append([event_id, end_time, message["payload"]["data"]["bonusPremium"], 0, 1])
+                    elif old_event[1] < int(time.time()) or old_event[2] != str(message["payload"]["data"]["bonusPremium"]):
+                        connection = self.pool.getconn()
+                        cursor = connection.cursor()
+                        cursor.execute(f"UPDATE {self.game.lower()}_events SET end_time = {end_time}, content = '{message['payload']['data']['bonusPremium']}', discount = 0, new = 1 WHERE id = {event_id}")
+                        connection.commit()
+                        self.pool.putconn(connection)
+                        old_event[1] = end_time
+                        old_event[2] = message["payload"]["data"]["bonusPremium"]
+                        old_event[3] = 0
+                        old_event[4] = 1
+        except Exception as e:
+            logging.error(f"error in on_message secondary socket {self.game}: {e}")
 
     def on_error(self, ws, error):
         logging.error(f"### error in secondary socket {self.game} ###")
