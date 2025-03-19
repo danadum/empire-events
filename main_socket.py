@@ -9,10 +9,10 @@ from secondary_socket import SecondarySocket
 
 
 class MainSocket(GgeSocket):
-    def __init__(self, pool, url, server_header, username, password):
+    def __init__(self, database, url, server_header, username, password):
         super().__init__(url, server_header, on_open=self.on_open, on_message=self.on_message, on_error=self.on_error, on_close=self.on_close)
         self.game = "GGE" if server_header.startswith("EmpireEx") else "E4K"
-        self.pool = pool
+        self.database = database
         self.username = username
         self.password = password
         self.temp_socket = None
@@ -20,25 +20,21 @@ class MainSocket(GgeSocket):
 
     def on_open(self, ws):
         logging.error(f"### Main socket {self.game} connected ###")
-        Thread(target=self.run).start()
+        Thread(target=self.run, daemon=True).start()
 
     def run(self):
-        connection = self.pool.getconn()
-        cursor = connection.cursor()
-        cursor.execute(f"SELECT * FROM {self.game.lower()}_events")
-        self.events = cursor.fetchall()
+        self.events = self.database.fetchall(f"SELECT * FROM {self.game.lower()}_events WHERE id IN (7, 75, 90, 999)")
         self.events = [list(event) for event in self.events]
-        self.pool.putconn(connection)
 
         self.init_socket()
-        Thread(target=self.keep_alive).start()
+        Thread(target=self.keep_alive, daemon=True).start()
         if self.game == "GGE":
             self.login(self.username, self.password)
         else:
             self.login_e4k(self.username, self.password)
-        Thread(target=self.offerings_thread).start()
-        Thread(target=self.attacks_thread).start()
-        Thread(target=self.events_thread).start()
+        Thread(target=self.offerings_thread, daemon=True).start()
+        Thread(target=self.attacks_thread, daemon=True).start()
+        Thread(target=self.events_thread, daemon=True).start()
 
     def offerings_thread(self):
         while self.sock is not None:
@@ -102,22 +98,11 @@ class MainSocket(GgeSocket):
                             discount = event.get('DIS', 0)
                             old_event = next(filter(lambda e: e[0] == event['EID'], self.events), None)
                             if old_event is None:
-                                connection = self.pool.getconn()
-                                cursor = connection.cursor()
-                                cursor.execute(f"INSERT INTO {self.game.lower()}_events (id, end_time, content, discount, new) VALUES ({event['EID']}, {end_time}, '{content}', {discount}, 1)")
-                                connection.commit()
-                                self.pool.putconn(connection)
+                                self.database.execute(f"INSERT INTO {self.game.lower()}_events (id, end_time, content, discount, new) VALUES ({event['EID']}, {end_time}, '{content}', {discount}, 1)")
                                 self.events.append([event['EID'], end_time, content, discount, 1])
                             elif old_event[1] < int(time.time()) or old_event[2] != content or old_event[3] != discount:
-                                connection = self.pool.getconn()
-                                cursor = connection.cursor()
-                                cursor.execute(f"UPDATE {self.game.lower()}_events SET end_time = {end_time}, content = '{content}', discount = {discount}, new = 1 WHERE id = {event['EID']}")
-                                connection.commit()
-                                self.pool.putconn(connection)
-                                old_event[1] = end_time
-                                old_event[2] = content
-                                old_event[3] = discount
-                                old_event[4] = 1
+                                self.database.execute(f"UPDATE {self.game.lower()}_events SET end_time = {end_time}, content = '{content}', discount = {discount}, new = 1 WHERE id = {event['EID']}")
+                                old_event[1:5] = [end_time, content, discount, 1]
                         elif event["EID"] == 106 and (self.temp_socket is None or self.temp_socket.sock is None):
                             if event["IPS"] == 0:
                                 if event["TSID"] in [16, 18]:
@@ -130,7 +115,7 @@ class MainSocket(GgeSocket):
                                 temp_socket_url = f"ws://{token_response['payload']['data']['TSIP']}"
                             else:
                                 temp_socket_url = f"wss://{token_response['payload']['data']['TSIP']}"
-                            self.temp_socket = SecondarySocket(self.pool, self.game, temp_socket_url, token_response["payload"]["data"]["TSZ"], token_response["payload"]["data"]["TLT"], "OR")
+                            self.temp_socket = SecondarySocket(self.database, self.game, temp_socket_url, token_response["payload"]["data"]["TSZ"], token_response["payload"]["data"]["TLT"], "OR")
                             Thread(target=self.temp_socket.run_forever, kwargs={'reconnect': False}).start()
                         elif event["EID"] == 113 and (self.temp_socket is None or self.temp_socket.sock is None):
                             if event["IPS"] == 0:
@@ -142,7 +127,7 @@ class MainSocket(GgeSocket):
                                 temp_socket_url = f"ws://{token_response['payload']['data']['TSIP']}"
                             else:
                                 temp_socket_url = f"wss://{token_response['payload']['data']['TSIP']}"
-                            self.temp_socket = SecondarySocket(self.pool, self.game, temp_socket_url, token_response["payload"]["data"]["TSZ"], token_response["payload"]["data"]["TLT"], "BTH")
+                            self.temp_socket = SecondarySocket(self.database, self.game, temp_socket_url, token_response["payload"]["data"]["TSZ"], token_response["payload"]["data"]["TLT"], "BTH")
                             Thread(target=self.temp_socket.run_forever, kwargs={'reconnect': False}).start()
                         elif event["EID"] == 117 and event.get("FTDC") == 1:
                             self.make_divination()
@@ -162,22 +147,11 @@ class MainSocket(GgeSocket):
                     end_time = message["payload"]["data"]["remainingTime"] + int(time.time())
                     old_event = next(filter(lambda e: e[0] == 999, self.events), None)
                     if old_event is None:
-                        connection = self.pool.getconn()
-                        cursor = connection.cursor()
-                        cursor.execute(f"INSERT INTO {self.game.lower()}_events (id, end_time, content, discount, new) VALUES (999, {end_time}, '{message['payload']['data']['bonusPremium']}', 0, 1)")
-                        connection.commit()
-                        self.pool.putconn(connection)
+                        self.database.execute(f"INSERT INTO {self.game.lower()}_events (id, end_time, content, discount, new) VALUES (999, {end_time}, '{message['payload']['data']['bonusPremium']}', 0, 1)")
                         self.events.append([999, end_time, message["payload"]["data"]["bonusPremium"], 0, 1])
                     elif old_event[1] < int(time.time()) or old_event[2] != str(message["payload"]["data"]["bonusPremium"]):
-                        connection = self.pool.getconn()
-                        cursor = connection.cursor()
-                        cursor.execute(f"UPDATE {self.game.lower()}_events SET end_time = {end_time}, content = '{message['payload']['data']['bonusPremium']}', discount = 0, new = 1 WHERE id = 999")
-                        connection.commit()
-                        self.pool.putconn(connection)
-                        old_event[1] = end_time
-                        old_event[2] = message["payload"]["data"]["bonusPremium"]
-                        old_event[3] = 0
-                        old_event[4] = 1
+                        self.database.execute(f"UPDATE {self.game.lower()}_events SET end_time = {end_time}, content = '{message['payload']['data']['bonusPremium']}', discount = 0, new = 1 WHERE id = 999")
+                        old_event[1:5] = [end_time, message["payload"]["data"]["bonusPremium"], 0, 1]
         except Exception as e:
             logging.error(f"Error in on_message {self.game}: {e}")
 

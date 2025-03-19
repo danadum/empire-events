@@ -6,14 +6,14 @@ import requests
 import ijson
 
 class Bot(commands.Bot):
-    def __init__(self, prefix, pool):
+    def __init__(self, prefix, database):
         with requests.get("https://empire-html5.goodgamestudios.com/default/items/ItemsVersion.properties") as response:
             items_version = response.text.split("=")[1]
         with requests.get(f"https://empire-html5.goodgamestudios.com/default/items/items_v{items_version}.json", stream=True) as response:
             response.raw.decode_content = True
             self.items = { key: value for key, value in ijson.kvitems(response.raw, '') if key in ["buildings", "shoppingCarts", "rewards"] }
         super().__init__(prefix, intents=discord.Intents.all())
-        self.pool = pool
+        self.database = database
         self.channel_gge_fr = 774929943540006952
         self.channel_gge_en = 956915826894708766
         self.channel_e4k_fr = 956916103869792266
@@ -26,8 +26,8 @@ class Bot(commands.Bot):
             logging.error(f"### Bot running ###")
             self.main_loop.start()
     
-    def set_pool(self, pool):
-        self.pool = pool
+    def set_database(self, database):
+        self.database = database
     
     def set_gge_socket(self, gge_socket):
         self.gge_socket = gge_socket
@@ -75,12 +75,8 @@ class Bot(commands.Bot):
                             except Exception as e:
                                 logging.error(f""""Failed to publish message: {e}""")
 
-                        connection = self.pool.getconn()
-                        cursor = connection.cursor()
-                        cursor.execute(f"UPDATE {game}_events SET new = 0 WHERE id = {event[0]}")
-                        connection.commit()
-                        self.pool.putconn(connection)
                         event[4] = 0
+                        self.database.execute(f"UPDATE {game}_events SET new = 0 WHERE id = {event[0]}")
 
     def get_event_names(self, event):
         if event[0] == 7:

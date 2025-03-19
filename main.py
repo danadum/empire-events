@@ -1,8 +1,8 @@
 import os
 import time
 from threading import Thread
-from psycopg2.pool import ThreadedConnectionPool
 
+from database import Database
 from bot import Bot
 from main_socket import MainSocket
 
@@ -27,25 +27,21 @@ if __name__ == "__main__":
 
     time.sleep(2)
 
-    pool = ThreadedConnectionPool(1, 5, host=POSTGRES_HOST, database=POSTGRES_DB, user=POSTGRES_USER, password=POSTGRES_PASSWORD, port=POSTGRES_PORT)
-    bot.set_pool(pool)
+    database = Database(1, 5, host=POSTGRES_HOST, database=POSTGRES_DB, user=POSTGRES_USER, password=POSTGRES_PASSWORD, port=POSTGRES_PORT)
+    bot.set_database(database)
 
-    connection = pool.getconn()
-    cursor = connection.cursor()
-    cursor.execute("CREATE TABLE IF NOT EXISTS gge_events (id INT PRIMARY KEY, end_time INT, content TEXT, discount INT, new INT)")
-    cursor.execute("CREATE TABLE IF NOT EXISTS e4k_events (id INT PRIMARY KEY, end_time INT, content TEXT, discount INT, new INT)")
-    connection.commit()
-    pool.putconn(connection)
+    database.execute("CREATE TABLE IF NOT EXISTS gge_events (id INT PRIMARY KEY, end_time INT, content TEXT, discount INT, new INT)")
+    database.execute("CREATE TABLE IF NOT EXISTS e4k_events (id INT PRIMARY KEY, end_time INT, content TEXT, discount INT, new INT)")
 
     time.sleep(2)
 
-    gge_socket = MainSocket(pool, "wss://ep-live-fr1-game.goodgamestudios.com/", "EmpireEx_3", GGE_USERNAME, GGE_PASSWORD)
+    gge_socket = MainSocket(database, "wss://ep-live-fr1-game.goodgamestudios.com/", "EmpireEx_3", GGE_USERNAME, GGE_PASSWORD)
     Thread(target=gge_socket.run_forever, kwargs={'reconnect': 600}).start()
     bot.set_gge_socket(gge_socket)
 
     time.sleep(2)
     
-    e4k_socket = MainSocket(pool, "ws://e4k-live-int4-game.goodgamestudios.com/", "EmpirefourkingdomsExGG_34", E4K_USERNAME, E4K_PASSWORD)
+    e4k_socket = MainSocket(database, "ws://e4k-live-int4-game.goodgamestudios.com/", "EmpirefourkingdomsExGG_34", E4K_USERNAME, E4K_PASSWORD)
     Thread(target=e4k_socket.run_forever, kwargs={'reconnect': 600}).start()
     bot.set_e4k_socket(e4k_socket)
 
