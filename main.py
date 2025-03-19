@@ -2,9 +2,9 @@ import os
 import time
 from threading import Thread
 
-from database import Database
-from bot import Bot
-from main_socket import MainSocket
+from lib.database import Database
+from lib.bot import Bot
+from lib.main_socket import MainSocket
 
 
 GGE_USERNAME = os.getenv("GGE_USERNAME")

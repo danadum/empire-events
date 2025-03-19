@@ -5,7 +5,7 @@ import time
 import traceback
 
 from pygge.gge_socket import GgeSocket
-from secondary_socket import SecondarySocket
+from lib.secondary_socket import SecondarySocket
 
 
 class MainSocket(GgeSocket):
