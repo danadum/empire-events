@@ -148,10 +148,10 @@ class MainSocket(GgeSocket):
                     old_event = next(filter(lambda e: e[0] == 999, self.events), None)
                     if old_event is None:
                         self.database.execute(f"INSERT INTO {self.game.lower()}_events (id, end_time, content, discount, new) VALUES (999, {end_time}, '{message['payload']['data']['bonusPremium']}', 0, 1)")
-                        self.events.append([999, end_time, message["payload"]["data"]["bonusPremium"], 0, 1])
+                        self.events.append([999, end_time, str(message["payload"]["data"]["bonusPremium"]), 0, 1])
                     elif old_event[1] < int(time.time()) or old_event[2] != str(message["payload"]["data"]["bonusPremium"]):
                         self.database.execute(f"UPDATE {self.game.lower()}_events SET end_time = {end_time}, content = '{message['payload']['data']['bonusPremium']}', discount = 0, new = 1 WHERE id = 999")
-                        old_event[1:5] = [end_time, message["payload"]["data"]["bonusPremium"], 0, 1]
+                        old_event[1:5] = [end_time, str(message["payload"]["data"]["bonusPremium"]), 0, 1]
         except Exception as e:
             logging.error(f"Error in on_message {self.game}: {e}")
 
