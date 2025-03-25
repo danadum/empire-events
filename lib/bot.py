@@ -44,7 +44,7 @@ class Bot(commands.Bot):
     async def send_event_notifications(self):
         for socket in [self.gge_socket, self.e4k_socket]:
             game = socket.game.lower()
-            events = socket.events
+            events = [event for event in socket.events]
             if socket.temp_socket is not None:
                 events += socket.temp_socket.events
             new_events = list(filter(lambda event: event[4] == 1, events))
@@ -75,8 +75,8 @@ class Bot(commands.Bot):
                             except Exception as e:
                                 logging.error(f""""Failed to publish message: {e}""")
 
-                        event[4] = 0
-                        self.database.execute(f"UPDATE {game}_events SET new = 0 WHERE id = {event[0]}")
+                event[4] = 0
+                self.database.execute(f"UPDATE {game}_events SET new = 0 WHERE id = {event[0]}")
 
     def get_event_names(self, event):
         if event[0] == 7:
