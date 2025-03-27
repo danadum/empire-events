@@ -48,13 +48,13 @@ if __name__ == "__main__":
     time.sleep(2)
 
     gge_socket = MainSocket(database, GGE_SERVER, GGE_SERVER_HEADER, GGE_USERNAME, GGE_PASSWORD)
-    Thread(target=gge_socket.run_forever, kwargs={'reconnect': 600}).start()
+    Thread(target=gge_socket.run_forever, kwargs={'reconnect': 600}, daemon=True).start()
     bot.set_gge_socket(gge_socket)
 
     time.sleep(2)
     
     e4k_socket = MainSocket(database, E4K_SERVER, E4K_SERVER_HEADER, E4K_USERNAME, E4K_PASSWORD)
-    Thread(target=e4k_socket.run_forever, kwargs={'reconnect': 600}).start()
+    Thread(target=e4k_socket.run_forever, kwargs={'reconnect': 600}, daemon=True).start()
     bot.set_e4k_socket(e4k_socket)
 
     time.sleep(2)
