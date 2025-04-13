@@ -30,9 +30,16 @@ class SecondarySocket(GgeSocket):
                 self.login_outer_realm(self.token, sync=(self.game == "GGE"))
             else:
                 self.login_bth(self.token, sync=(self.game == "GGE"))
+            Thread(target=self.auto_close_thread, daemon=True).start()
         except Exception as e:
             logging.error(f"error in run secondary socket {self.game}: {e}")
             logging.error(traceback.format_exc())
+            self.close()
+
+    def auto_close_thread(self):
+        time.sleep(60 * 60 * 6)
+        if self.sock:
+            logging.warning(f"### Auto-closing Secondary socket {self.game} after 6h ###")
             self.close()
 
     def on_message(self, ws, message):
