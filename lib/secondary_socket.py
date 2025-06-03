@@ -21,15 +21,16 @@ class SecondarySocket(GgeSocket):
 
     def run(self):
         try:
-            self.events = self.database.fetchall(f"SELECT * FROM {self.game.lower()}_events WHERE id IN (997, 998)")
-            self.events = [list(event) for event in self.events]
-
             self.init_socket()
             Thread(target=self.keep_alive, daemon=True).start()
             if self.server_type == "OR":
                 self.login_outer_realm(self.token, sync=(self.game == "GGE"))
             else:
                 self.login_bth(self.token, sync=(self.game == "GGE"))
+
+            self.events = self.database.fetchall(f"SELECT * FROM {self.game.lower()}_events WHERE id IN (997, 998)")
+            self.events = [list(event) for event in self.events]
+
             Thread(target=self.auto_close_thread, daemon=True).start()
         except Exception as e:
             logging.error(f"error in run secondary socket {self.game}: {e}")

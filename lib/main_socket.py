@@ -24,17 +24,18 @@ class MainSocket(GgeSocket):
 
     def run(self):
         try:
-            self.events = self.database.fetchall(f"SELECT * FROM {self.game.lower()}_events WHERE id IN (7, 75, 90, 999)")
-            self.events = [list(event) for event in self.events]
-
             self.init_socket()
             Thread(target=self.keep_alive, daemon=True).start()
             if self.game == "GGE":
                 self.login(self.username, self.password)
             else:
                 self.login_e4k(self.username, self.password)
-            Thread(target=self.offerings_thread, daemon=True).start()
-            Thread(target=self.attacks_thread, daemon=True).start()
+
+            self.events = self.database.fetchall(f"SELECT * FROM {self.game.lower()}_events WHERE id IN (7, 75, 90, 999)")
+            self.events = [list(event) for event in self.events]
+
+            # Thread(target=self.offerings_thread, daemon=True).start()
+            # Thread(target=self.attacks_thread, daemon=True).start()
             Thread(target=self.events_thread, daemon=True).start()
         except Exception as e:
             logging.error(f"Error in run main socket {self.game}: {e}")
